@@ -138,7 +138,8 @@ Stop cancels the frontend request; the backend always caps iterations.
 
 | Symptom | Cause / fix |
 |---|---|
-| Every page returns `500 MIDDLEWARE_INVOCATION_FAILED` | `NEXT_PUBLIC_SUPABASE_URL` must be a full `https://<ref>.supabase.co` URL (no trailing text) and the anon key must be set. These values are **inlined at build time**, so after changing them in the host's environment settings you must **redeploy** — a rebuild is required. |
+| Every page returns `500 MIDDLEWARE_INVOCATION_FAILED` | The middleware was running on the Edge runtime, whose CDN isolate cannot evaluate the Supabase SDK's module graph — it throws during module evaluation, *before* the handler runs, so no `try/catch` can contain it. `middleware.ts` now sets `runtime: "nodejs"` (stable since Next.js 15.5), which runs the same code that works locally. Keep `next` at `>=15.5` for this to stay valid. |
+| Login fails / auth broken after deploy | `NEXT_PUBLIC_SUPABASE_URL` must be a full `https://<ref>.supabase.co` URL (no trailing text) and the anon key must be set. These values are **inlined at build time**, so after changing them in the host's environment settings you must **redeploy** — a rebuild is required. |
 | Landing shows but login fails | Check Supabase URL/anon key; confirm auth provider enabled |
 | "No AI provider is configured" | Set at least one provider key and restart |
 | Search says unavailable | Set `TAVILY_API_KEY` (optional) |

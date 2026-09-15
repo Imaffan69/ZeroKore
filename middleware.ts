@@ -1,6 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
 
+/** Lets us identify which build is live from outside (response header). */
+const BUILD_TAG = "mw-3";
+
 function isProtected(pathname: string) {
   return (
     pathname === "/dashboard" ||
@@ -13,8 +16,13 @@ function isApi(pathname: string) {
   return pathname.startsWith("/api/");
 }
 
+function tag(response: NextResponse) {
+  response.headers.set("x-zerokore-mw", BUILD_TAG);
+  return response;
+}
+
 function apiError(message: string, status: number) {
-  return NextResponse.json({ error: message }, { status });
+  return tag(NextResponse.json({ error: message }, { status }));
 }
 
 /**
@@ -27,6 +35,7 @@ export async function middleware(request: NextRequest) {
 
   try {
     const { response, supabase } = await updateSession(request);
+    tag(response);
 
     // Public routes: only refresh cookies, then continue unconditionally.
     if (!isProtected(pathname)) return response;
@@ -80,11 +89,17 @@ export async function middleware(request: NextRequest) {
       }
       return NextResponse.redirect(new URL("/login", request.url));
     }
-    return NextResponse.next({ request });
+    return tag(NextResponse.next({ request }));
   }
 }
 
 export const config = {
+  // Vercel's Edge middleware runtime (a CDN isolate) cannot evaluate the
+  // Supabase SDK's module graph; the failure happens BEFORE this handler runs,
+  // so no try/catch can contain it, and every matched route returns
+  // 500 MIDDLEWARE_INVOCATION_FAILED. The Node.js runtime runs the same code
+  // that works locally, so refresh + auth checks behave normally.
+  runtime: "nodejs",
   matcher: [
     "/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js)$).*)",
   ],
