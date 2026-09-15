@@ -103,7 +103,9 @@ never supplies ownership. Users cannot change their own role (policy +
 `prevent_role_escalation` trigger). Messages are reachable only through
 conversations owned by the caller. `middleware.ts` protects `/dashboard/*`
 (redirect) and `/api/agent` (401) — the API re-authenticates server-side
-regardless.
+regardless. Session refresh is best-effort and never throws: a missing,
+malformed, or unreachable Supabase project degrades to an anonymous request
+(public pages still render) instead of failing the whole deployment.
 
 ## Usage limits
 
@@ -136,6 +138,7 @@ Stop cancels the frontend request; the backend always caps iterations.
 
 | Symptom | Cause / fix |
 |---|---|
+| Every page returns `500 MIDDLEWARE_INVOCATION_FAILED` | `NEXT_PUBLIC_SUPABASE_URL` must be a full `https://<ref>.supabase.co` URL (no trailing text) and the anon key must be set. These values are **inlined at build time**, so after changing them in the host's environment settings you must **redeploy** — a rebuild is required. |
 | Landing shows but login fails | Check Supabase URL/anon key; confirm auth provider enabled |
 | "No AI provider is configured" | Set at least one provider key and restart |
 | Search says unavailable | Set `TAVILY_API_KEY` (optional) |
