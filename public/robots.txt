@@ -1,4 +1,4 @@
-# deploy-probe: dd88ebf-nomw (static file; served without running middleware)
+# deploy-probe: vercel-json-nextjs (static file; served straight from the CDN)
 
 User-agent: *
 Allow: /
