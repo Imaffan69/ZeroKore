@@ -103,7 +103,7 @@ export default function ArtifactViewer({
       {/* Header */}
       <div className="flex flex-wrap items-center gap-2 border-b border-kore-border px-3 py-2.5">
         <div className="mr-auto min-w-0">
-          <p className="truncate text-sm font-semibold text-white" title={artifact.title}>
+          <p className="truncate text-sm font-semibold text-kore-strong" title={artifact.title}>
             {artifact.title}
           </p>
           <p className="font-mono text-[11px] text-kore-muted">
@@ -116,7 +116,7 @@ export default function ArtifactViewer({
             "flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 font-mono text-xs transition",
             copied
               ? "border-kore-accent/60 bg-kore-accent/10 text-kore-accent"
-              : "border-kore-border text-kore-muted hover:border-kore-accent/40 hover:text-white"
+              : "border-kore-border text-kore-muted hover:border-kore-accent/40 hover:text-kore-strong"
           )}
           aria-label="Copy artifact content"
         >
@@ -143,7 +143,7 @@ export default function ArtifactViewer({
               "flex items-center gap-1.5 rounded-t-md px-3 py-1.5 font-mono text-xs transition",
               activeTab === "preview"
                 ? "bg-kore-bg text-kore-accent"
-                : "text-kore-muted hover:text-white"
+                : "text-kore-muted hover:text-kore-strong"
             )}
           >
             <Eye className="h-3.5 w-3.5" aria-hidden /> Preview
@@ -157,10 +157,10 @@ export default function ArtifactViewer({
             "flex items-center gap-1.5 rounded-t-md px-3 py-1.5 font-mono text-xs transition",
             activeTab === "code"
               ? "bg-kore-bg text-kore-accent"
-              : "text-kore-muted hover:text-white"
-          )}
-        >
-          <Code2 className="h-3.5 w-3.5" aria-hidden /> Code
+              : "text-kore-muted hover:text-kore-strong"
+            )}
+          >
+            <Code2 className="h-3.5 w-3.5" aria-hidden /> Code
         </button>
         {showMarkdownTab && (
           <button
@@ -171,7 +171,7 @@ export default function ArtifactViewer({
               "flex items-center gap-1.5 rounded-t-md px-3 py-1.5 font-mono text-xs transition",
               activeTab === "markdown"
                 ? "bg-kore-bg text-kore-accent"
-                : "text-kore-muted hover:text-white"
+                : "text-kore-muted hover:text-kore-strong"
             )}
           >
             <BookOpen className="h-3.5 w-3.5" aria-hidden /> Markdown
@@ -190,13 +190,13 @@ export default function ArtifactViewer({
           />
         )}
         {activeTab === "code" && (
-          <pre className="max-w-full overflow-x-auto p-3 font-mono text-xs leading-relaxed text-emerald-100">
+          <pre className="max-w-full overflow-x-auto p-3 font-mono text-xs leading-relaxed text-kore-text">
             <code>{artifact.content}</code>
           </pre>
         )}
         {activeTab === "markdown" && showMarkdownTab && (
           <div
-            className="kore-prose max-w-full p-4 text-sm leading-relaxed [&_a]:text-kore-accent [&_a]:underline [&_code]:rounded [&_code]:bg-kore-panel [&_code]:px-1 [&_code]:text-[0.85em] [&_code]:text-emerald-200 [&_h2]:text-lg [&_h2]:font-bold [&_h2]:text-white [&_h3]:text-base [&_h3]:font-bold [&_h3]:text-white [&_h4]:font-bold [&_h4]:text-white [&_li]:ml-4 [&_li]:list-disc [&_strong]:text-white"
+            className="kore-prose max-w-full p-4 text-sm leading-relaxed [&_a]:text-kore-accent [&_a]:underline [&_code]:rounded [&_code]:bg-kore-panel2 [&_code]:px-1 [&_code]:text-[0.85em] [&_code]:text-kore-accent [&_h2]:text-lg [&_h2]:font-bold [&_h2]:text-kore-strong [&_h3]:text-base [&_h3]:font-bold [&_h3]:text-kore-strong [&_h4]:font-bold [&_h4]:text-kore-strong [&_li]:ml-4 [&_li]:list-disc [&_strong]:text-kore-strong"
             dangerouslySetInnerHTML={{
               __html: renderMarkdownSafe(artifact.content),
             }}

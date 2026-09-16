@@ -53,7 +53,7 @@ export default function ToolBar({
   return (
     <div className="border-t border-kore-border bg-kore-panel px-3 py-3 sm:px-4">
       {limitReached && (
-        <p role="alert" className="mb-2 rounded-md border border-kore-warn/40 bg-kore-warn/10 px-3 py-2 text-xs text-amber-200">
+        <p role="alert" className="mb-2 rounded-md border border-kore-warn/40 bg-kore-warn/10 px-3 py-2 text-xs text-kore-warn">
           Daily AI request limit reached (15/15). Resets tomorrow — your
           conversation and typed input are preserved.
         </p>
@@ -68,7 +68,7 @@ export default function ToolBar({
               "flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 font-mono text-xs transition",
               mode === m.id
                 ? "border-kore-accent/60 bg-kore-accent/10 text-kore-accent"
-                : "border-kore-border text-kore-muted hover:border-kore-accent/30 hover:text-white"
+                : "border-kore-border text-kore-muted hover:border-kore-accent/30 hover:text-kore-strong"
             )}
           >
             <m.icon className="h-3.5 w-3.5" aria-hidden />
@@ -99,7 +99,7 @@ export default function ToolBar({
         {loading ? (
           <button
             onClick={onStop}
-            className="flex h-11 shrink-0 items-center gap-1.5 rounded-lg border border-kore-danger/50 bg-kore-danger/10 px-3.5 text-sm font-semibold text-red-300 transition hover:bg-kore-danger/20"
+            className="flex h-11 shrink-0 items-center gap-1.5 rounded-lg border border-kore-danger/50 bg-kore-danger/10 px-3.5 text-sm font-semibold text-kore-danger transition hover:bg-kore-danger/20"
             aria-label="Stop generation"
           >
             <Square className="h-4 w-4 fill-current" aria-hidden />
@@ -109,7 +109,7 @@ export default function ToolBar({
           <button
             onClick={onSend}
             disabled={!value.trim() || limitReached}
-            className="flex h-11 shrink-0 items-center gap-1.5 rounded-lg bg-kore-accent px-3.5 text-sm font-semibold text-black transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex h-11 shrink-0 items-center gap-1.5 rounded-lg bg-kore-accent px-3.5 text-sm font-semibold text-kore-onAccent transition hover:bg-kore-accentDim disabled:cursor-not-allowed disabled:opacity-40"
             aria-label="Send message"
           >
             <Send className="h-4 w-4" aria-hidden />
@@ -118,7 +118,7 @@ export default function ToolBar({
         )}
         <button
           onClick={onNew}
-          className="flex h-11 shrink-0 items-center rounded-lg border border-kore-border px-3 text-kore-muted transition hover:border-kore-accent/40 hover:text-white"
+          className="flex h-11 shrink-0 items-center rounded-lg border border-kore-border px-3 text-kore-muted transition hover:border-kore-accent/40 hover:text-kore-strong"
           aria-label="New task"
           title="New task"
         >

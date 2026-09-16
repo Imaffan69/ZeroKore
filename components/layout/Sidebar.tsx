@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  Terminal,
   Plus,
   MessageSquare,
   BrainCircuit,
@@ -15,6 +14,8 @@ import {
 } from "lucide-react";
 import type { AgentMode, Conversation, UsageState } from "@/types";
 import { cn } from "@/lib/utils";
+import { ThemeToggle } from "@/lib/theme";
+import { APP_VERSION, APP_CODENAME } from "@/lib/version";
 
 export type SidebarView = "workspace" | "memory" | "settings";
 
@@ -78,7 +79,7 @@ export default function Sidebar(props: SidebarProps) {
       {/* Mobile scrim */}
       <div
         className={cn(
-          "fixed inset-0 z-30 bg-black/60 transition-opacity lg:hidden",
+          "fixed inset-0 z-30 bg-black/50 backdrop-blur-sm transition-opacity lg:hidden",
           open ? "opacity-100" : "pointer-events-none opacity-0"
         )}
         onClick={onClose}
@@ -94,20 +95,23 @@ export default function Sidebar(props: SidebarProps) {
         {/* Brand */}
         <div className="flex items-center justify-between border-b border-kore-border px-4 py-3.5">
           <div className="flex items-center gap-2.5">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-kore-accent/40 bg-kore-bg">
-              <Terminal className="h-4 w-4 text-kore-accent" aria-hidden />
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-kore-accent/40 bg-kore-bg shadow-glow">
+              <span className="font-mono text-sm font-bold text-kore-accent">Z</span>
             </span>
-            <span className="font-mono text-sm font-bold tracking-widest">
+            <span className="font-mono text-sm font-bold tracking-widest text-kore-strong">
               ZERO<span className="text-kore-accent">KORE</span>
             </span>
           </div>
-          <button
-            onClick={onClose}
-            className="rounded p-1.5 text-kore-muted hover:bg-kore-bg hover:text-white lg:hidden"
-            aria-label="Close sidebar"
-          >
-            <X className="h-5 w-5" aria-hidden />
-          </button>
+          <div className="flex items-center gap-1">
+            <ThemeToggle className="h-8 w-8" />
+            <button
+              onClick={onClose}
+              className="rounded p-1.5 text-kore-muted hover:bg-kore-bg hover:text-kore-strong lg:hidden"
+              aria-label="Close sidebar"
+            >
+              <X className="h-5 w-5" aria-hidden />
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto px-3 py-3">
@@ -137,7 +141,7 @@ export default function Sidebar(props: SidebarProps) {
             </div>
             <div className="flex items-center justify-between">
               <span className="text-kore-muted">DATABASE</span>
-              <span className={dbOk ? "text-kore-accent" : "text-kore-warn"}>
+              <span className={dbOk ? "text-kore-success" : "text-kore-warn"}>
                 {dbOk ? "● CONNECTED" : "● UNKNOWN"}
               </span>
             </div>
@@ -193,7 +197,7 @@ export default function Sidebar(props: SidebarProps) {
                   "flex flex-col items-center gap-1 rounded-lg border px-2 py-2 text-xs transition",
                   mode === m.id
                     ? "border-kore-accent/60 bg-kore-accent/10 text-kore-accent"
-                    : "border-kore-border bg-kore-bg text-kore-muted hover:border-kore-accent/30 hover:text-white"
+                    : "border-kore-border bg-kore-bg text-kore-muted hover:border-kore-accent/30 hover:text-kore-strong"
                 )}
               >
                 <m.icon className="h-4 w-4" aria-hidden />
@@ -208,7 +212,7 @@ export default function Sidebar(props: SidebarProps) {
               onNew();
               onClose();
             }}
-            className="mb-3 flex w-full items-center justify-center gap-2 rounded-lg bg-kore-accent px-3 py-2.5 text-sm font-semibold text-black transition hover:bg-emerald-400"
+            className="mb-3 flex w-full items-center justify-center gap-2 rounded-lg bg-kore-accent px-3 py-2.5 text-sm font-semibold text-kore-onAccent transition hover:bg-kore-accentDim"
           >
             <Plus className="h-4 w-4" aria-hidden />
             New Task
@@ -253,7 +257,7 @@ export default function Sidebar(props: SidebarProps) {
                 </button>
                 <button
                   onClick={() => onDelete(c.id)}
-                  className="mr-1 rounded p-1.5 text-kore-muted opacity-0 transition hover:bg-kore-danger/20 hover:text-red-300 focus:opacity-100 group-hover:opacity-100"
+                  className="mr-1 rounded p-1.5 text-kore-muted opacity-0 transition hover:bg-kore-danger/20 hover:text-kore-danger focus:opacity-100 group-hover:opacity-100"
                   aria-label={`Delete conversation ${c.title}`}
                   title="Delete (asks for confirmation)"
                 >
@@ -274,7 +278,7 @@ export default function Sidebar(props: SidebarProps) {
                 "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition",
                 view === "memory"
                   ? "bg-kore-accent/10 text-kore-accent"
-                  : "text-kore-muted hover:bg-kore-bg hover:text-white"
+                  : "text-kore-muted hover:bg-kore-bg hover:text-kore-strong"
               )}
             >
               <BrainCircuit className="h-4 w-4" aria-hidden />
@@ -289,7 +293,7 @@ export default function Sidebar(props: SidebarProps) {
                 "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition",
                 view === "settings"
                   ? "bg-kore-accent/10 text-kore-accent"
-                  : "text-kore-muted hover:bg-kore-bg hover:text-white"
+                  : "text-kore-muted hover:bg-kore-bg hover:text-kore-strong"
               )}
             >
               <Settings className="h-4 w-4" aria-hidden />
@@ -298,15 +302,18 @@ export default function Sidebar(props: SidebarProps) {
           </div>
         </div>
 
-        {/* Logout */}
+        {/* Logout + version */}
         <div className="border-t border-kore-border p-3">
           <button
             onClick={onLogout}
-            className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-kore-muted transition hover:bg-kore-danger/10 hover:text-red-300"
+            className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-kore-muted transition hover:bg-kore-danger/10 hover:text-kore-danger"
           >
             <LogOut className="h-4 w-4" aria-hidden />
             Logout
           </button>
+          <p className="mt-2 px-2.5 font-mono text-[10px] tracking-wider text-kore-muted">
+            v{APP_VERSION} · {APP_CODENAME}
+          </p>
         </div>
       </aside>
     </>

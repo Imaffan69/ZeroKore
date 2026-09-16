@@ -9,6 +9,9 @@ import ExecutionTerminal from "@/components/agent/ExecutionTerminal";
 import ArtifactViewer from "@/components/agent/ArtifactViewer";
 import DualPanelCanvas from "@/components/agent/DualPanelCanvas";
 import ToolBar from "@/components/agent/ToolBar";
+import CommandPalette from "@/components/CommandPalette";
+import { ThemeSegmented } from "@/lib/theme";
+import { APP_VERSION, APP_CODENAME, APP_BUILD_DATE, CHANGELOG } from "@/lib/version";
 import { createClient } from "@/lib/supabase/client";
 import type {
   AgentEvent,
@@ -35,6 +38,7 @@ function uid(): string {
 export default function DashboardPage() {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const [view, setView] = useState<SidebarView>("workspace");
 
   const [email, setEmail] = useState("");
@@ -114,10 +118,14 @@ export default function DashboardPage() {
     };
   }, [router]);
 
-  // --- Escape closes sidebar ---
+  // --- Escape closes sidebar; Cmd/Ctrl+K toggles the command palette ---
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") setSidebarOpen(false);
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setPaletteOpen((p) => !p);
+      }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -358,7 +366,7 @@ export default function DashboardPage() {
       <span className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-kore-accent/40 bg-kore-bg shadow-glow">
         <Terminal className="h-6 w-6 text-kore-accent" aria-hidden />
       </span>
-      <p className="font-mono text-sm tracking-widest text-white">
+      <p className="font-mono text-sm tracking-widest text-kore-strong">
         ZERO <span className="text-kore-accent">KORE</span>
       </p>
       <p className="mt-1 text-xs text-kore-muted">
@@ -375,7 +383,7 @@ export default function DashboardPage() {
               setInput(s);
               document.getElementById("kore-input")?.focus();
             }}
-            className="rounded-lg border border-kore-border bg-kore-bg px-3 py-2.5 text-left text-sm text-kore-muted transition hover:border-kore-accent/50 hover:text-white"
+            className="rounded-lg border border-kore-border bg-kore-bg px-3 py-2.5 text-left text-sm text-kore-muted transition hover:border-kore-accent/50 hover:text-kore-strong"
           >
             {s}
           </button>
@@ -409,6 +417,7 @@ export default function DashboardPage() {
       <div className="flex min-w-0 flex-1 flex-col">
         <Header
           onMenu={() => setSidebarOpen(true)}
+          onCommand={() => setPaletteOpen(true)}
           title={view === "workspace" ? activeTitle : view === "memory" ? "Memory" : "Settings"}
           mode={mode}
           status={loading ? "loading" : error ? "error" : "idle"}
@@ -447,7 +456,7 @@ export default function DashboardPage() {
         {view === "memory" && (
           <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">
             <div className="mx-auto max-w-2xl">
-              <h2 className="mb-1 text-lg font-bold text-white">Long-term memory</h2>
+              <h2 className="mb-1 text-lg font-bold text-kore-strong">Long-term memory</h2>
               <p className="mb-4 text-sm text-kore-muted">
                 Durable facts ZeroKore recalls across conversations. Scoped to
                 your account only.
@@ -468,7 +477,7 @@ export default function DashboardPage() {
                       </span>
                       <button
                         onClick={() => deleteMemory(m.id)}
-                        className="rounded p-1.5 text-kore-muted transition hover:bg-kore-danger/20 hover:text-red-300"
+                        className="rounded p-1.5 text-kore-muted transition hover:bg-kore-danger/20 hover:text-kore-danger"
                         aria-label="Delete memory"
                       >
                         <Trash2 className="h-4 w-4" aria-hidden />
@@ -485,7 +494,7 @@ export default function DashboardPage() {
           <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">
             <div className="mx-auto max-w-2xl space-y-4">
               <div>
-                <h2 className="mb-1 text-lg font-bold text-white">Settings</h2>
+                <h2 className="mb-1 text-lg font-bold text-kore-strong">Settings</h2>
                 <p className="text-sm text-kore-muted">
                   Safe preferences only. API secrets are never exposed here.
                 </p>
@@ -513,6 +522,13 @@ export default function DashboardPage() {
                   Database: {dbOk ? "Connected" : "Unknown"}
                 </p>
               </div>
+              <div className="rounded-lg border border-kore-border bg-kore-panel p-4 text-sm">
+                <p className="mb-2 font-mono text-xs text-kore-muted">APPEARANCE</p>
+                <ThemeSegmented />
+                <p className="mt-2 text-xs text-kore-muted">
+                  Choose a theme, or follow your operating system automatically.
+                </p>
+              </div>
               <div className="rounded-lg border border-kore-accent/25 bg-kore-panel2 p-4 text-sm text-kore-muted">
                 <p className="mb-1 font-mono text-xs text-kore-accent">SETUP NOTE</p>
                 <p>
@@ -522,10 +538,56 @@ export default function DashboardPage() {
                   faking results.
                 </p>
               </div>
+
+              {/* About / version */}
+              <div className="rounded-lg border border-kore-border bg-kore-panel p-4 text-sm">
+                <p className="mb-2 font-mono text-xs text-kore-muted">ABOUT</p>
+                <p className="text-kore-strong">
+                  ZeroKore <span className="font-mono text-kore-accent">v{APP_VERSION}</span>{" "}
+                  <span className="text-kore-muted">· {APP_CODENAME}</span>
+                </p>
+                <p className="mb-3 text-xs text-kore-muted">Build {APP_BUILD_DATE}</p>
+                <div className="space-y-3 border-t border-kore-border pt-3">
+                  {CHANGELOG.map((entry) => (
+                    <div key={entry.version}>
+                      <p className="font-mono text-xs text-kore-strong">
+                        v{entry.version}
+                        <span className="ml-2 font-sans font-normal text-kore-muted">
+                          {entry.title}
+                        </span>
+                      </p>
+                      <ul className="mt-1 space-y-0.5">
+                        {entry.notes.map((n) => (
+                          <li
+                            key={n}
+                            className="flex gap-1.5 text-xs text-kore-muted"
+                          >
+                            <span className="text-kore-accent" aria-hidden>
+                              ·
+                            </span>
+                            <span>{n}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         )}
       </div>
+
+      <CommandPalette
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        onNewTask={newTask}
+        onGoWorkspace={() => changeView("workspace")}
+        onGoMemory={() => changeView("memory")}
+        onGoSettings={() => changeView("settings")}
+        onMode={setMode}
+        onLogout={logout}
+      />
 
       {/* Toast */}
       {toast && (

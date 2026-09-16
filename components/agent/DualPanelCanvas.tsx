@@ -35,7 +35,7 @@ export default function DualPanelCanvas({
             "flex items-center justify-center gap-1.5 rounded-md px-3 py-2 font-mono text-xs transition",
             mobileTab === "execution"
               ? "bg-kore-accent/15 text-kore-accent"
-              : "text-kore-muted hover:text-white"
+              : "text-kore-muted hover:text-kore-strong"
           )}
         >
           <TerminalSquare className="h-4 w-4" aria-hidden />
@@ -49,7 +49,7 @@ export default function DualPanelCanvas({
             "relative flex items-center justify-center gap-1.5 rounded-md px-3 py-2 font-mono text-xs transition",
             mobileTab === "artifact"
               ? "bg-kore-accent/15 text-kore-accent"
-              : "text-kore-muted hover:text-white"
+              : "text-kore-muted hover:text-kore-strong"
           )}
         >
           <FileCode2 className="h-4 w-4" aria-hidden />

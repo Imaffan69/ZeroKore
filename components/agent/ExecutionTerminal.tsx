@@ -65,12 +65,12 @@ interface TerminalProps {
 
 const EVENT_STYLE: Record<AgentEvent["kind"], string> = {
   agent_started: "text-kore-accent",
-  memory_retrieved: "text-sky-300",
+  memory_retrieved: "text-kore-accent",
   tool_call: "text-kore-warn",
   tool_completed: "text-kore-muted",
   provider_fallback: "text-kore-warn",
-  generating_artifact: "text-emerald-300",
-  completed: "text-kore-accent",
+  generating_artifact: "text-kore-success",
+  completed: "text-kore-success",
   error: "text-kore-danger",
 };
 
@@ -121,7 +121,7 @@ export default function ExecutionTerminal({
               <p className="whitespace-pre-wrap break-words">{msg.content}</p>
             ) : (
               <div
-                className="kore-prose [&_a]:text-kore-accent [&_a]:underline [&_code]:rounded [&_code]:bg-kore-panel [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[0.82em] [&_code]:text-emerald-200 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_strong]:text-white"
+                className="kore-prose [&_a]:text-kore-accent [&_a]:underline [&_code]:rounded [&_code]:bg-kore-panel2 [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[0.82em] [&_code]:text-kore-accent [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_strong]:text-kore-strong"
                 dangerouslySetInnerHTML={{ __html: renderSafe(msg.content) }}
               />
             )}
@@ -164,7 +164,7 @@ export default function ExecutionTerminal({
       {error && (
         <div
           role="alert"
-          className="flex items-start gap-2 rounded-lg border border-kore-danger/40 bg-kore-danger/10 px-3.5 py-2.5 text-sm text-red-300"
+          className="flex items-start gap-2 rounded-lg border border-kore-danger/40 bg-kore-danger/10 px-3.5 py-2.5 text-sm text-kore-danger"
         >
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
           <span className="break-words">{error}</span>
