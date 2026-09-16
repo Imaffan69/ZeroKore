@@ -1,3 +1,5 @@
+# deploy-probe: 7b1b08e-mw4 (static file; served without running middleware)
+
 User-agent: *
 Allow: /
 Disallow: /dashboard
