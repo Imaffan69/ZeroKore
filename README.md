@@ -44,7 +44,6 @@ zerokore/
 ├── lib/usage.ts, lib/utils.ts
 ├── supabase/schema.sql
 ├── types/index.ts
-├── middleware.ts
 └── .env.example
 ```
 
@@ -101,12 +100,15 @@ idempotently. Logout invalidates the session and redirects to login.
 Every user-owned table has RLS; policies use `auth.uid()` only — the client
 never supplies ownership. Users cannot change their own role (policy +
 `prevent_role_escalation` trigger). Messages are reachable only through
-conversations owned by the caller. `middleware.ts` redirects `/dashboard/*` to
-`/login` when no Supabase session cookie is present, and every `/api/*` route
-re-authenticates server-side regardless (401). The middleware imports only
-`next/server`, which keeps its module graph Edge-safe: a missing, malformed, or
-unreachable Supabase project degrades to an anonymous request (public pages
-still render) instead of failing the whole deployment.
+conversations owned by the caller. `app/dashboard/layout.tsx` verifies the
+session on the Node.js server and redirects to `/login` when there is none, and
+every `/api/*` route re-authenticates server-side regardless (401). There is
+deliberately **no `middleware.ts`**: routing middleware runs on the CDN's Edge
+isolate, where it kept failing with `500 MIDDLEWARE_INVOCATION_FAILED` for every
+matched route (even routes that do not exist), which took the whole site down.
+A gate in a server layout cannot do that — an error there is contained to
+`/dashboard`, which is why public pages keep rendering when Supabase is missing,
+malformed, or unreachable.
 
 ## Usage limits
 
@@ -139,8 +141,8 @@ Stop cancels the frontend request; the backend always caps iterations.
 
 | Symptom | Cause / fix |
 |---|---|
-| Every page returns `500 MIDDLEWARE_INVOCATION_FAILED` | The middleware ran in Vercel's Edge isolate, which cannot evaluate the Supabase SDK's module graph (`ws` → `node:buffer`, `node:async_hooks`). It throws during **module evaluation**, before the handler runs — so no `try/catch` can contain it, and *every* matched route 500s, even routes that do not exist. Fix: keep `middleware.ts` free of SDK imports (it uses only `next/server`) and do token validation in route handlers. |
-| Unsure which build is live | `curl -sSI https://<domain>/ | grep -i x-zerokore-mw` — the header value identifies the middleware build (e.g. `mw-4`). |
+| Every page returns `500 MIDDLEWARE_INVOCATION_FAILED` | Routing middleware runs on the CDN's Edge isolate and a failure there is **not containable**: it happens while the middleware module loads, before any `try/catch` runs, so *every* matched route 500s — including routes that do not exist. This project had no need for it: `/dashboard` and `/api/*` already gate themselves server-side. Do not re-add `middleware.ts` unless you can verify it on the host first. |
+| Unsure which build is live | `curl -sS https://<domain>/robots.txt` — `robots.txt` is served straight from the CDN, so the `deploy-probe` line in it identifies the live build without involving any server code. |
 | Login fails / auth broken after deploy | `NEXT_PUBLIC_SUPABASE_URL` must be a full `https://<ref>.supabase.co` URL (no trailing text) and the anon key must be set. These values are **inlined at build time**, so after changing them in the host's environment settings you must **redeploy** — a rebuild is required. |
 | Landing shows but login fails | Check Supabase URL/anon key; confirm auth provider enabled |
 | "No AI provider is configured" | Set at least one provider key and restart |

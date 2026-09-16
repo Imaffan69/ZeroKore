@@ -1,6 +1,19 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
+/**
+ * Every server-side Supabase call is capped so an unreachable project fails
+ * fast instead of holding the request open until the platform times it out.
+ */
+const REQUEST_TIMEOUT_MS = 10_000;
+
+function timeoutFetch(input: RequestInfo | URL, init?: RequestInit) {
+  return fetch(input, {
+    ...init,
+    signal: init?.signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+}
+
 export async function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -11,6 +24,7 @@ export async function createClient() {
   }
   const cookieStore = await cookies();
   return createServerClient(url, anon, {
+    global: { fetch: timeoutFetch },
     cookies: {
       getAll() {
         return cookieStore.getAll();
@@ -45,5 +59,6 @@ export async function createServiceClient() {
   }
   return createJsClient(url, serviceKey, {
     auth: { autoRefreshToken: false, persistSession: false },
+    global: { fetch: timeoutFetch },
   });
 }
