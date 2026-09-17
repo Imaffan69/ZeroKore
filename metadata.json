@@ -1,0 +1,8 @@
+{
+  "name": "ZeroKore",
+  "description": "Production-grade autonomous agentic AI platform with coding, research, tools, memory, and artifacts.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
