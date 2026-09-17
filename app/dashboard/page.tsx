@@ -355,7 +355,7 @@ export default function DashboardPage() {
 
   const emptyHint = (
     <div className="flex h-full flex-col items-center justify-center py-10 text-center">
-      <span className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-kore-accent/40 bg-kore-bg shadow-glow">
+      <span className="glass glass-sheen mb-4 flex h-12 w-12 items-center justify-center rounded-2xl shadow-glow">
         <Terminal className="h-6 w-6 text-kore-accent" aria-hidden />
       </span>
       <p className="font-mono text-sm tracking-widest text-white">
@@ -375,7 +375,7 @@ export default function DashboardPage() {
               setInput(s);
               document.getElementById("kore-input")?.focus();
             }}
-            className="rounded-lg border border-kore-border bg-kore-bg px-3 py-2.5 text-left text-sm text-kore-muted transition hover:border-kore-accent/50 hover:text-white"
+            className="glass glass-interactive rounded-full px-3 py-2.5 text-left text-sm text-kore-muted hover:text-white"
           >
             {s}
           </button>
@@ -453,7 +453,7 @@ export default function DashboardPage() {
                 your account only.
               </p>
               {memories.length === 0 ? (
-                <p className="rounded-lg border border-dashed border-kore-border p-6 text-center text-sm text-kore-muted">
+                <p className="glass-subtle rounded-xl p-6 text-center text-sm text-kore-muted">
                   No saved memory yet.
                 </p>
               ) : (
@@ -461,7 +461,7 @@ export default function DashboardPage() {
                   {memories.map((m) => (
                     <li
                       key={m.id}
-                      className="flex items-start gap-2 rounded-lg border border-kore-border bg-kore-panel px-3 py-2.5 text-sm"
+                      className="glass glass-interactive glass-sheen flex items-start gap-2 rounded-xl px-3 py-2.5 text-sm"
                     >
                       <span className="min-w-0 flex-1 break-words text-kore-text">
                         {m.content}
@@ -490,11 +490,11 @@ export default function DashboardPage() {
                   Safe preferences only. API secrets are never exposed here.
                 </p>
               </div>
-              <div className="rounded-lg border border-kore-border bg-kore-panel p-4 text-sm">
+              <div className="glass glass-sheen rounded-2xl p-4 text-sm">
                 <p className="mb-1 font-mono text-xs text-kore-muted">ACCOUNT</p>
                 <p className="break-words text-kore-text">{email || "—"}</p>
               </div>
-              <div className="rounded-lg border border-kore-border bg-kore-panel p-4 text-sm">
+              <div className="glass glass-sheen rounded-2xl p-4 text-sm">
                 <p className="mb-1 font-mono text-xs text-kore-muted">USAGE</p>
                 <p className="text-kore-text">
                   {usage
@@ -504,7 +504,7 @@ export default function DashboardPage() {
                     : "Loading…"}
                 </p>
               </div>
-              <div className="rounded-lg border border-kore-border bg-kore-panel p-4 text-sm">
+              <div className="glass glass-sheen rounded-2xl p-4 text-sm">
                 <p className="mb-1 font-mono text-xs text-kore-muted">STATUS</p>
                 <p className="text-kore-text">
                   Provider: {providerFallback ? `${providerFallback} → ` : ""}{provider}
@@ -513,7 +513,7 @@ export default function DashboardPage() {
                   Database: {dbOk ? "Connected" : "Unknown"}
                 </p>
               </div>
-              <div className="rounded-lg border border-kore-accent/25 bg-kore-panel2 p-4 text-sm text-kore-muted">
+              <div className="glass-accent glass-sheen rounded-2xl p-4 text-sm text-kore-muted">
                 <p className="mb-1 font-mono text-xs text-kore-accent">SETUP NOTE</p>
                 <p>
                   AI providers and web search are configured server-side via
@@ -531,7 +531,7 @@ export default function DashboardPage() {
       {toast && (
         <div
           role="status"
-          className="fixed bottom-20 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-lg border border-kore-accent/40 bg-kore-panel px-4 py-2.5 text-sm text-kore-text shadow-panel"
+          className="glass glass-sheen fixed bottom-20 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-full px-4 py-2.5 text-sm text-kore-text"
         >
           <CheckCircle2 className="h-4 w-4 text-kore-accent" aria-hidden />
           {toast}

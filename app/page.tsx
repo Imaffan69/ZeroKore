@@ -71,9 +71,9 @@ export default async function LandingPage() {
       />
 
       {/* Nav */}
-      <header className="relative z-10 mx-auto flex max-w-6xl items-center justify-between px-4 py-5 sm:px-6">
+      <header className="glass-bar glass-sheen sticky top-0 z-10 mx-auto flex max-w-6xl items-center justify-between rounded-none border-x-0 px-4 py-5 sm:px-6">
         <div className="flex items-center gap-2.5">
-          <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-kore-accent/40 bg-kore-panel shadow-glow">
+          <span className="glass flex h-9 w-9 items-center justify-center rounded-lg shadow-glow">
             <Terminal className="h-5 w-5 text-kore-accent" aria-hidden />
           </span>
           <span className="font-mono text-lg font-bold tracking-widest">
@@ -83,13 +83,13 @@ export default async function LandingPage() {
         <nav className="flex items-center gap-2 sm:gap-3" aria-label="Account">
           <Link
             href="/login"
-            className="rounded-md border border-kore-border px-3 py-2 text-sm text-kore-text transition hover:border-kore-accent/60 hover:text-white sm:px-4"
+            className="glass glass-interactive rounded-full px-4 py-2 text-sm text-kore-text hover:border-kore-accent/60 hover:text-white sm:px-5"
           >
             Login
           </Link>
           <Link
             href="/signup"
-            className="group flex items-center gap-1.5 rounded-md bg-kore-accent px-3 py-2 text-sm font-semibold text-black transition hover:bg-emerald-400 sm:px-4"
+            className="glass-interactive group flex items-center gap-1.5 rounded-full bg-kore-accent px-4 py-2 text-sm font-semibold text-black shadow-glow transition hover:bg-emerald-400 sm:px-5"
           >
             Sign Up
             <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden />
@@ -99,7 +99,7 @@ export default async function LandingPage() {
 
       {/* Hero */}
       <section className="relative z-10 mx-auto max-w-6xl px-4 pb-16 pt-10 text-center sm:px-6 sm:pt-16">
-        <div className="mx-auto mb-5 inline-flex items-center gap-2 rounded-full border border-kore-accent/30 bg-kore-panel px-3 py-1.5 font-mono text-xs text-kore-accent">
+        <div className="glass-accent mx-auto mb-5 inline-flex items-center gap-2 rounded-full px-4 py-1.5 font-mono text-xs text-kore-accent">
           <span className="relative flex h-2 w-2" aria-hidden>
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-kore-accent opacity-60" />
             <span className="relative inline-flex h-2 w-2 rounded-full bg-kore-accent" />
@@ -120,14 +120,14 @@ export default async function LandingPage() {
         <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <Link
             href="/signup"
-            className="group flex w-full items-center justify-center gap-2 rounded-md bg-kore-accent px-6 py-3 font-semibold text-black shadow-glow transition hover:bg-emerald-400 sm:w-auto"
+            className="glass-interactive group flex w-full items-center justify-center gap-2 rounded-full bg-kore-accent px-7 py-3 font-semibold text-black shadow-glow transition hover:bg-emerald-400 sm:w-auto"
           >
             Start Building
             <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden />
           </Link>
           <Link
             href="/login"
-            className="w-full rounded-md border border-kore-border bg-kore-panel px-6 py-3 font-semibold text-kore-text transition hover:border-kore-accent/60 hover:text-white sm:w-auto"
+            className="glass glass-interactive w-full rounded-full px-7 py-3 font-semibold text-kore-text hover:border-kore-accent/60 hover:text-white sm:w-auto"
           >
             Login to Workspace
           </Link>
@@ -139,7 +139,7 @@ export default async function LandingPage() {
           <span className="mr-1">CASCADE:</span>
           {PROVIDERS.map((p, i) => (
             <span key={p} className="flex items-center gap-2">
-              <span className="rounded border border-kore-border bg-kore-panel px-2 py-1 text-kore-text">
+              <span className="glass-subtle rounded-full px-2.5 py-1 text-kore-text">
                 ● {p}
               </span>
               {i < PROVIDERS.length - 1 && <span aria-hidden>→</span>}
@@ -154,7 +154,7 @@ export default async function LandingPage() {
           {FEATURES.map((f) => (
             <div
               key={f.title}
-              className="rounded-xl border border-kore-border bg-kore-panel/80 p-5 text-left shadow-panel transition hover:border-kore-accent/40"
+              className="glass glass-interactive glass-sheen rounded-2xl p-5 text-left"
             >
               <f.icon className="mb-3 h-6 w-6 text-kore-accent" aria-hidden />
               <h2 className="mb-1.5 font-semibold text-white">{f.title}</h2>
@@ -166,7 +166,7 @@ export default async function LandingPage() {
 
       {/* Security */}
       <section className="relative z-10 mx-auto max-w-6xl px-4 pb-20 sm:px-6" aria-label="Security">
-        <div className="flex flex-col items-start gap-3 rounded-xl border border-kore-accent/25 bg-kore-panel2 p-5 sm:flex-row sm:items-center sm:p-6">
+        <div className="glass-accent glass-sheen flex flex-col items-start gap-3 rounded-2xl p-5 sm:flex-row sm:items-center sm:p-6">
           <ShieldCheck className="h-8 w-8 shrink-0 text-kore-accent" aria-hidden />
           <div>
             <h2 className="font-semibold text-white">Security statement</h2>

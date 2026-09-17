@@ -114,7 +114,7 @@ export default function ExecutionTerminal({
               "min-w-0 max-w-full rounded-lg border px-3.5 py-2.5 text-sm leading-relaxed sm:max-w-[90%]",
               msg.role === "user"
                 ? "border-kore-accent/30 bg-kore-accent/10 text-kore-text"
-                : "border-kore-border bg-kore-bg text-kore-text"
+                : "glass-subtle text-kore-text"
             )}
           >
             {msg.role === "user" ? (
@@ -135,7 +135,7 @@ export default function ExecutionTerminal({
       ))}
 
       {events.length > 0 && (
-        <div className="rounded-lg border border-kore-border bg-kore-bg/70 px-3.5 py-2.5 font-mono text-xs leading-relaxed">
+        <div className="glass-subtle rounded-xl px-3.5 py-2.5 font-mono text-xs leading-relaxed">
           {events.map((e, i) => (
             <div key={`${e.at}-${i}`} className={cn("break-words", EVENT_STYLE[e.kind])}>
               {e.message}
@@ -164,7 +164,7 @@ export default function ExecutionTerminal({
       {error && (
         <div
           role="alert"
-          className="flex items-start gap-2 rounded-lg border border-kore-danger/40 bg-kore-danger/10 px-3.5 py-2.5 text-sm text-red-300"
+          className="glass-interactive flex items-start gap-2 rounded-xl border border-kore-danger/40 bg-kore-danger/10 px-3.5 py-2.5 text-sm text-red-300"
         >
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
           <span className="break-words">{error}</span>

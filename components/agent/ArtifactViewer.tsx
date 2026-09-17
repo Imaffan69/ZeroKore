@@ -75,7 +75,7 @@ export default function ArtifactViewer({
 
   if (!artifact) {
     return (
-      <div className="flex h-full min-h-[240px] flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-kore-border bg-kore-panel/50 p-6 text-center">
+      <div className="glass-subtle flex h-full min-h-[240px] flex-col items-center justify-center gap-2 rounded-2xl p-6 text-center">
         <FileCode2 className="h-8 w-8 text-kore-muted" aria-hidden />
         <p className="font-mono text-sm text-kore-muted">
           No artifact generated yet.
@@ -98,7 +98,7 @@ export default function ArtifactViewer({
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2 }}
-      className="flex h-full min-h-[240px] flex-col overflow-hidden rounded-xl border border-kore-border bg-kore-panel"
+      className="glass glass-sheen flex h-full min-h-[240px] flex-col overflow-hidden rounded-2xl"
     >
       {/* Header */}
       <div className="flex flex-wrap items-center gap-2 border-b border-kore-border px-3 py-2.5">

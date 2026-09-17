@@ -20,7 +20,7 @@ const MODE_LABEL: Record<AgentMode, string> = {
 
 export default function Header({ onMenu, title, mode, status, provider }: HeaderProps) {
   return (
-    <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-kore-border bg-kore-panel/95 px-3 py-2.5 backdrop-blur sm:px-4">
+    <header className="glass-bar glass-sheen sticky top-0 z-20 flex items-center gap-3 px-3 py-2.5 sm:px-4">
       <button
         onClick={onMenu}
         className="rounded-md p-2 text-kore-muted transition hover:bg-kore-bg hover:text-white lg:hidden"
@@ -39,7 +39,7 @@ export default function Header({ onMenu, title, mode, status, provider }: Header
       </div>
 
       <div
-        className="flex shrink-0 items-center gap-1.5 rounded-full border border-kore-border bg-kore-bg px-2.5 py-1 font-mono text-xs"
+        className="glass-subtle flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 font-mono text-xs"
         role="status"
         aria-label={status === "loading" ? "Agent working" : status === "error" ? "Error" : "Idle"}
       >

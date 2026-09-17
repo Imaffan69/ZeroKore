@@ -23,7 +23,7 @@ export default function DualPanelCanvas({
     <div className="flex min-h-0 flex-1 flex-col">
       {/* Mobile panel switcher */}
       <div
-        className="grid shrink-0 grid-cols-2 gap-1 border-b border-kore-border bg-kore-panel p-1.5 lg:hidden"
+        className="glass-bar grid shrink-0 grid-cols-2 gap-1 p-1.5 lg:hidden"
         role="tablist"
         aria-label="Workspace panels"
       >
@@ -68,7 +68,7 @@ export default function DualPanelCanvas({
         <section
           aria-label="Execution terminal"
           className={cn(
-            "min-h-0 overflow-y-auto px-3 py-4 sm:px-4 lg:rounded-xl lg:border lg:border-kore-border lg:bg-kore-panel",
+            "min-h-0 overflow-y-auto px-3 py-4 sm:px-4 lg:glass lg:glass-sheen lg:rounded-2xl",
             mobileTab === "execution" ? "block" : "hidden lg:block"
           )}
         >

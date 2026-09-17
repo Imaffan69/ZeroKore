@@ -95,9 +95,9 @@ export default function AuthForm({ mode }: { mode: Mode }) {
   }
 
   return (
-    <div className="w-full max-w-md rounded-xl border border-kore-border bg-kore-panel p-6 shadow-panel sm:p-8">
+    <div className="glass glass-sheen w-full max-w-md rounded-3xl p-6 sm:p-8">
       <div className="mb-6 flex items-center gap-2.5">
-        <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-kore-accent/40 bg-kore-bg">
+        <span className="glass-accent flex h-9 w-9 items-center justify-center rounded-2xl">
           <Terminal className="h-5 w-5 text-kore-accent" aria-hidden />
         </span>
         <span className="font-mono text-lg font-bold tracking-widest">
@@ -117,7 +117,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
       {error && (
         <div
           role="alert"
-          className="mb-4 flex items-start gap-2 rounded-md border border-kore-danger/40 bg-kore-danger/10 px-3 py-2.5 text-sm text-red-300"
+          className="mb-4 flex items-start gap-2 rounded-xl border border-kore-danger/40 bg-kore-danger/10 px-3 py-2.5 text-sm text-red-300"
         >
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
           <span>{error}</span>
@@ -126,7 +126,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
       {info && (
         <div
           role="status"
-          className="mb-4 rounded-md border border-kore-accent/40 bg-kore-accent/10 px-3 py-2.5 text-sm text-emerald-300"
+          className="mb-4 rounded-xl border border-kore-accent/40 bg-kore-accent/10 px-3 py-2.5 text-sm text-emerald-300"
         >
           {info}
         </div>
@@ -145,7 +145,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
             onChange={(e) => setEmail(e.target.value)}
             disabled={loading}
             placeholder="you@example.com"
-            className="w-full rounded-md border border-kore-border bg-kore-bg px-3 py-2.5 text-sm text-kore-text placeholder:text-kore-muted/60 focus:border-kore-accent disabled:opacity-60"
+            className="glass-subtle w-full rounded-2xl px-4 py-2.5 text-sm text-kore-text placeholder:text-kore-muted/60 focus:border-kore-accent disabled:opacity-60"
           />
         </div>
         <div>
@@ -160,7 +160,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
             onChange={(e) => setPassword(e.target.value)}
             disabled={loading}
             placeholder="••••••••"
-            className="w-full rounded-md border border-kore-border bg-kore-bg px-3 py-2.5 text-sm text-kore-text placeholder:text-kore-muted/60 focus:border-kore-accent disabled:opacity-60"
+            className="glass-subtle w-full rounded-2xl px-4 py-2.5 text-sm text-kore-text placeholder:text-kore-muted/60 focus:border-kore-accent disabled:opacity-60"
           />
         </div>
         {isSignup && (
@@ -179,14 +179,14 @@ export default function AuthForm({ mode }: { mode: Mode }) {
               onChange={(e) => setConfirm(e.target.value)}
               disabled={loading}
               placeholder="••••••••"
-              className="w-full rounded-md border border-kore-border bg-kore-bg px-3 py-2.5 text-sm text-kore-text placeholder:text-kore-muted/60 focus:border-kore-accent disabled:opacity-60"
+              className="glass-subtle w-full rounded-2xl px-4 py-2.5 text-sm text-kore-text placeholder:text-kore-muted/60 focus:border-kore-accent disabled:opacity-60"
             />
           </div>
         )}
         <button
           type="submit"
           disabled={loading}
-          className="flex w-full items-center justify-center gap-2 rounded-md bg-kore-accent px-4 py-2.5 font-semibold text-black transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+          className="glass-interactive flex w-full items-center justify-center gap-2 rounded-full bg-kore-accent px-4 py-2.5 font-semibold text-black shadow-glow transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {loading && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
           {loading

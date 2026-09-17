@@ -29,6 +29,11 @@ const config: Config = {
       boxShadow: {
         glow: "0 0 24px rgba(16, 185, 129, 0.25)",
         panel: "0 8px 32px rgba(0, 0, 0, 0.45)",
+        glass: "0 8px 32px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08)",
+        glassHover: "0 12px 40px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.12)",
+      },
+      backdropBlur: {
+        xs: "2px",
       },
     },
   },

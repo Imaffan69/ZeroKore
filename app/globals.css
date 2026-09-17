@@ -70,6 +70,12 @@ body {
   .kore-caret {
     animation: none;
   }
+  .glass-interactive {
+    transition: none;
+  }
+  .glass-interactive:active {
+    transform: none;
+  }
   *,
   *::before,
   *::after {
@@ -77,6 +83,92 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ---- iOS glass-morphism design system ---- */
+
+/* Translucent layered surface */
+.glass {
+  background: linear-gradient(
+    145deg,
+    rgba(24, 32, 48, 0.72),
+    rgba(13, 20, 32, 0.58)
+  );
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+/* Lighter glass for nested panels */
+.glass-subtle {
+  background: rgba(17, 24, 39, 0.45);
+  backdrop-filter: blur(12px) saturate(140%);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+  border: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+/* Accent-tinted glass (highlights, hero cards) */
+.glass-accent {
+  background: linear-gradient(
+    145deg,
+    rgba(16, 185, 129, 0.12),
+    rgba(13, 20, 32, 0.6)
+  );
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.35),
+    0 0 40px rgba(16, 185, 129, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* Interactive glass element: hover lift + iOS-style press */
+.glass-interactive {
+  transition:
+    transform 0.25s cubic-bezier(0.32, 0.72, 0, 1),
+    box-shadow 0.25s cubic-bezier(0.32, 0.72, 0, 1),
+    border-color 0.25s ease;
+  will-change: transform;
+}
+.glass-interactive:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+.glass-interactive:active {
+  transform: translateY(0) scale(0.985);
+}
+
+/* Frosted sticky bars (header, toolbar) */
+.glass-bar {
+  background: rgba(9, 13, 22, 0.68);
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+/* Thin highlight line at the top edge of glass cards (iOS sheen) */
+.glass-sheen {
+  position: relative;
+}
+.glass-sheen::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.18),
+    transparent
+  );
+  pointer-events: none;
+}
+
 
 /* Code blocks: wrap text, scroll code horizontally in its own container */
 .kore-prose {
