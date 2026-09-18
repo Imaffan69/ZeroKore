@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { writeGitHubToken } from "@/lib/github";
 
 /**
  * GitHub OAuth: start + callback in one route.
@@ -13,7 +14,6 @@ import { createClient } from "@/lib/supabase/server";
  * error instead of faking success.
  */
 
-const TABLE = "github_connections";
 const SCOPE = "repo read:user";
 
 function redirectUri(req: NextRequest): string {
@@ -107,7 +107,8 @@ export async function GET(req: NextRequest) {
     const ghLogin =
       typeof ghUser?.login === "string" ? ghUser.login : "github-user";
 
-    // Persist server-side under the authenticated user id.
+    // Persist server-side under the authenticated user id. `github_connections`
+    // has no client policies, so this must go through the service client.
     const supabase = await createClient();
     const {
       data: { user },
@@ -115,12 +116,14 @@ export async function GET(req: NextRequest) {
     if (!user) {
       return backWithError(req, "Session expired during GitHub connection. Sign in and retry.");
     }
-    await supabase.from(TABLE).upsert({
-      user_id: user.id,
-      github_login: ghLogin,
-      access_token: accessToken,
-      updated_at: new Date().toISOString(),
-    });
+    try {
+      await writeGitHubToken(user.id, ghLogin, accessToken);
+    } catch {
+      return backWithError(
+        req,
+        "GitHub authorised, but ZeroKore could not store the token. Check SUPABASE_SERVICE_ROLE_KEY on the server."
+      );
+    }
 
     const target = new URL("/dashboard", url.origin);
     target.searchParams.set("github_connected", ghLogin);

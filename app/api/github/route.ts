@@ -1,5 +1,13 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { requireUser, errorResponse } from "@/lib/api-auth";
+import {
+  readGitHubLogin,
+  deleteGitHubToken,
+  isGitHubOAuthConfigured,
+  isGitHubStorageConfigured,
+} from "@/lib/github";
+
+export const dynamic = "force-dynamic";
 
 /**
  * Minimal, safe GitHub account connection surface.
@@ -8,80 +16,41 @@ import { createClient } from "@/lib/supabase/server";
  *        signed-in user stored a GitHub token? Never returns token values.
  * DELETE → removes the caller's stored token.
  *
- * The OAuth exchange lives in /api/github/oauth (separate route, below).
- * GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET come from environment variables
- * (Vercel env / GitHub secrets) and never reach the browser.
+ * `github_connections` has row-level security with NO client policies, so the
+ * token row is only reachable with the service-role client (see lib/github.ts).
+ * Reading it with the user's own session returned nothing, which is why the
+ * connection used to look permanently disconnected.
  */
-
-const TABLE = "github_connections";
-
 export async function GET() {
-  let supabase;
   try {
-    supabase = await createClient();
-  } catch {
-    return NextResponse.json(
-      { error: "Server misconfigured." },
-      { status: 500 }
-    );
-  }
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json(
-      { error: "Authentication required." },
-      { status: 401 }
-    );
-  }
+    const { user } = await requireUser();
 
-  const configured =
-    !!process.env.GITHUB_CLIENT_ID && !!process.env.GITHUB_CLIENT_SECRET;
+    const configured = isGitHubOAuthConfigured();
+    const storage = isGitHubStorageConfigured();
+    const login = storage ? await readGitHubLogin(user.id) : null;
 
-  let connected = false;
-  let user_ = null as string | null;
-  try {
-    const { data } = await supabase
-      .from(TABLE)
-      .select("github_login")
-      .eq("user_id", user.id)
-      .maybeSingle();
-    connected = !!data?.github_login;
-    user_ = data?.github_login ?? null;
-  } catch {
-    // Table may not exist yet (schema not applied); report honestly.
+    return NextResponse.json({
+      configured,
+      storage,
+      connected: !!login,
+      user: login,
+      message: !configured
+        ? "Set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET on the server to enable GitHub."
+        : !storage
+          ? "GitHub connections need SUPABASE_SERVICE_ROLE_KEY on the server."
+          : undefined,
+    });
+  } catch (err) {
+    return errorResponse(err);
   }
-
-  return NextResponse.json({
-    configured,
-    connected,
-    user: user_,
-  });
 }
 
 export async function DELETE() {
-  let supabase;
   try {
-    supabase = await createClient();
-  } catch {
-    return NextResponse.json(
-      { error: "Server misconfigured." },
-      { status: 500 }
-    );
+    const { user } = await requireUser();
+    await deleteGitHubToken(user.id);
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    return errorResponse(err);
   }
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json(
-      { error: "Authentication required." },
-      { status: 401 }
-    );
-  }
-  try {
-    await supabase.from(TABLE).delete().eq("user_id", user.id);
-  } catch {
-    // Report success anyway: the row is gone or never existed for this user.
-  }
-  return NextResponse.json({ ok: true });
 }

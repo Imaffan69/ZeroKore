@@ -72,6 +72,8 @@ export interface AgentRequestBody {
   mode: AgentMode;
   /** Explicit model/provider choice. "auto" uses the cascade order. */
   provider?: ProviderPreference;
+  /** When set, the run belongs to this project: its files and preview update. */
+  projectId?: string | null;
 }
 
 /** A provider row in the model picker: availability comes from /api/health. */

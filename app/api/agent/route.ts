@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { checkAndIncrementUsage } from "@/lib/usage";
 import { runAgent } from "@/lib/ai/agent";
+import { applyArtifactToProject } from "@/lib/projects";
 import type { AgentMode, AgentResponseBody, ProviderPreference } from "@/types";
 
 export const maxDuration = 120;
@@ -16,6 +17,7 @@ export async function POST(req: NextRequest) {
     conversationId?: unknown;
     mode?: unknown;
     provider?: unknown;
+    projectId?: unknown;
   };
   try {
     body = await req.json();
@@ -45,6 +47,11 @@ export async function POST(req: NextRequest) {
         ? (body.provider as ProviderPreference)
         : "auto"
       : "auto";
+
+  // A project run must belong to the caller; the id is verified below against
+  // the user's own rows before anything is written into that project.
+  const requestedProjectId =
+    typeof body.projectId === "string" && body.projectId ? body.projectId : null;
 
   if (!message) {
     return NextResponse.json(
@@ -77,6 +84,25 @@ export async function POST(req: NextRequest) {
       { error: "Authentication required." },
       { status: 401 }
     );
+  }
+
+  // Ownership check for project runs: an unowned or unknown project id is
+  // rejected outright rather than silently dropped.
+  let projectId: string | null = null;
+  if (requestedProjectId) {
+    const { data: owned } = await supabase
+      .from("projects")
+      .select("id")
+      .eq("id", requestedProjectId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (!owned) {
+      return NextResponse.json(
+        { error: "That project does not exist, or is not yours." },
+        { status: 404 }
+      );
+    }
+    projectId = requestedProjectId;
   }
 
   // Server-side rate limit (15/day for users, unlimited for admins).
@@ -112,7 +138,25 @@ export async function POST(req: NextRequest) {
       conversationId,
       mode,
       preferredProvider: provider,
+      projectId,
     });
+
+    // Artifacts become project surfaces: rendered output fills the preview
+    // environment, everything else becomes a real, editable project file.
+    let savedTo: { kind: "preview" | "file"; label: string } | null = null;
+    if (projectId && result.artifact) {
+      try {
+        savedTo = await applyArtifactToProject(
+          supabase,
+          projectId,
+          result.artifact
+        );
+      } catch {
+        console.log(
+          JSON.stringify({ event: "artifact_project_save_failed" })
+        );
+      }
+    }
 
     const response: AgentResponseBody = {
       reply: result.reply,
@@ -124,7 +168,7 @@ export async function POST(req: NextRequest) {
       fallbackFrom: result.fallbackFrom,
       usage: usageCheck.usage,
     };
-    return NextResponse.json(response);
+    return NextResponse.json({ ...response, savedTo });
   } catch (err) {
     console.log(JSON.stringify({ event: "agent_failed" }));
     const msg =

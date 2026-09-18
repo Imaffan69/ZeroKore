@@ -59,6 +59,8 @@ export interface AgentRunInput {
   mode: AgentMode;
   /** Explicit model choice from the model picker; null/"auto" = cascade. */
   preferredProvider?: ProviderPreference | null;
+  /** Project this run belongs to, so the conversation is filed under it. */
+  projectId?: string | null;
 }
 
 export interface AgentRunResult {
@@ -115,7 +117,12 @@ export async function runAgent(input: AgentRunInput): Promise<AgentRunResult> {
     conversationTitle = makeTitle(message);
     const { data: created, error } = await supabase
       .from("conversations")
-      .insert({ user_id: userId, title: conversationTitle })
+      .insert({
+        user_id: userId,
+        title: conversationTitle,
+        // Filed under its project, so the project page can list its runs.
+        project_id: input.projectId ?? null,
+      })
       .select("id")
       .single();
     if (error || !created) {
