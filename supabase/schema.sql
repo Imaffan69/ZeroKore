@@ -153,6 +153,21 @@ create policy "messages_in_own_conversations" on public.messages
     )
   );
 
+-- ------------------------------------------------------------
+-- github_connections: one OAuth token per user, service-managed.
+-- ------------------------------------------------------------
+create table if not exists public.github_connections (
+  user_id uuid primary key references auth.users (id) on delete cascade,
+  github_login text,
+  access_token text not null,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.github_connections enable row level security;
+-- No client policies on purpose: tokens are written/read exclusively by the
+-- server (service role / route handlers). Users can disconnect via DELETE
+-- /api/github, which runs server-side with their session.
+
 -- ============================================================
 -- Signup trigger: create profile (role 'user') + usage row.
 -- Idempotent: never overwrites an existing profile.

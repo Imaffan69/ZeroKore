@@ -695,7 +695,7 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-8 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-8 sm:grid-cols-4">
             {[
               {
                 title: "Product",
@@ -718,6 +718,13 @@ export default function LandingPage() {
                 links: [
                   { label: "Health", href: "/api/health" },
                   { label: "Status", href: "#security" },
+                ],
+              },
+              {
+                title: "Legal",
+                links: [
+                  { label: "Terms of Service", href: "/terms" },
+                  { label: "Privacy Policy", href: "/privacy" },
                 ],
               },
             ].map((col) => (

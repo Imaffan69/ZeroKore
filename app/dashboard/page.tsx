@@ -17,11 +17,17 @@ import {
 import Sidebar, { type SidebarView } from "@/components/layout/Sidebar";
 import Header from "@/components/layout/Header";
 import SkillsPanel from "@/components/skills/SkillsPanel";
+import SettingsPanel from "@/components/settings/SettingsPanel";
 import ExecutionTerminal from "@/components/agent/ExecutionTerminal";
 import ArtifactViewer from "@/components/agent/ArtifactViewer";
 import DualPanelCanvas from "@/components/agent/DualPanelCanvas";
 import ToolBar from "@/components/agent/ToolBar";
 import { createClient } from "@/lib/supabase/client";
+import {
+  loadPreferences,
+  savePreferences,
+  DEFAULT_PREFERENCES,
+} from "@/lib/preferences";
 import { EASE, fadeUp, staggerGroup, hoverLift, press } from "@/lib/motion";
 import type {
   AgentEvent,
@@ -31,6 +37,7 @@ import type {
   ChatMessage,
   Conversation,
   MemoryRecord,
+  ProviderPreference,
   UsageState,
 } from "@/types";
 
@@ -89,6 +96,7 @@ export default function DashboardPage() {
   const [dbOk, setDbOk] = useState(false);
   const [memories, setMemories] = useState<MemoryRecord[]>([]);
   const [toast, setToast] = useState<string | null>(null);
+  const [preferences, setPreferences] = useState(DEFAULT_PREFERENCES);
 
   const abortRef = useRef<AbortController | null>(null);
   const inputRef = useRef<string>("");
@@ -158,6 +166,22 @@ export default function DashboardPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // --- Load persisted preferences (project name, pinned model, motion) ---
+  useEffect(() => {
+    setPreferences(loadPreferences());
+  }, []);
+
+  const updatePreferences = useCallback(
+    (patch: Partial<typeof DEFAULT_PREFERENCES>) => {
+      setPreferences((prev) => {
+        const nextPrefs = { ...prev, ...patch };
+        savePreferences(nextPrefs);
+        return nextPrefs;
+      });
+    },
+    []
+  );
+
   const refreshUsage = useCallback(async () => {
     try {
       const res = await fetch("/api/usage");
@@ -214,6 +238,7 @@ export default function DashboardPage() {
           message: text,
           conversationId: activeId,
           mode,
+          provider: preferences.preferredProvider,
         }),
         signal: controller.signal,
       });
@@ -576,51 +601,23 @@ export default function DashboardPage() {
         )}
 
         {view === "settings" && (
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">
-            <div className="mx-auto max-w-2xl space-y-4">
-              <div>
-                <h2 className="mb-1.5 text-lg font-semibold tracking-tight text-white">
-                  Settings
-                </h2>
-                <p className="text-sm leading-relaxed text-kore-muted">
-                  Your account and runtime status. Secret keys stay on the
-                  server and are never shown here.
-                </p>
-              </div>
-              <div className="glass glass-sheen rounded-2xl p-4 text-sm">
-                <p className="mb-1 font-mono text-xs text-kore-muted">ACCOUNT</p>
-                <p className="break-words text-kore-text">{email || "—"}</p>
-              </div>
-              <div className="glass glass-sheen rounded-2xl p-4 text-sm">
-                <p className="mb-1 font-mono text-xs text-kore-muted">USAGE</p>
-                <p className="text-kore-text">
-                  {usage
-                    ? usage.unlimited
-                      ? "Unlimited (admin)"
-                      : `${usage.used} / ${usage.limit} requests today`
-                    : "Loading…"}
-                </p>
-              </div>
-              <div className="glass glass-sheen rounded-2xl p-4 text-sm">
-                <p className="mb-1 font-mono text-xs text-kore-muted">STATUS</p>
-                <p className="text-kore-text">
-                  Provider: {providerFallback ? `${providerFallback} → ` : ""}{provider}
-                </p>
-                <p className="text-kore-text">
-                  Database: {dbOk ? "Connected" : "Unknown"}
-                </p>
-              </div>
-              <div className="glass-accent glass-sheen rounded-2xl p-4 text-sm text-kore-muted">
-                <p className="mb-1 font-mono text-xs text-kore-accent">SETUP NOTE</p>
-                <p>
-                  AI providers and web search are configured server-side via
-                  environment variables (see .env.example). Missing optional
-                  keys degrade gracefully — the agent tells you instead of
-                  faking results.
-                </p>
-              </div>
-            </div>
-          </div>
+          <SettingsPanel
+            email={email}
+            usage={usage}
+            provider={providerFallback ? `${providerFallback} → ${provider}` : provider}
+            providerFallback={providerFallback}
+            dbOk={dbOk}
+            preferredProvider={preferences.preferredProvider}
+            onProviderChange={(p: ProviderPreference) => {
+              updatePreferences({ preferredProvider: p });
+              showToast(
+                p === "auto"
+                  ? "Model set to Auto (fastest available)."
+                  : `Default model set to ${p}.`
+              );
+            }}
+            onToast={showToast}
+          />
         )}
       </div>
 

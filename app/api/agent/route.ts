@@ -2,15 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { checkAndIncrementUsage } from "@/lib/usage";
 import { runAgent } from "@/lib/ai/agent";
-import type { AgentMode, AgentResponseBody } from "@/types";
+import type { AgentMode, AgentResponseBody, ProviderPreference } from "@/types";
 
 export const maxDuration = 120;
 
 const MODES: AgentMode[] = ["coding", "research", "general"];
+const PROVIDERS = ["Groq", "DeepSeek", "SambaNova", "Gemini"];
 const MAX_MESSAGE_LENGTH = 12000;
 
 export async function POST(req: NextRequest) {
-  let body: { message?: unknown; conversationId?: unknown; mode?: unknown };
+  let body: {
+    message?: unknown;
+    conversationId?: unknown;
+    mode?: unknown;
+    provider?: unknown;
+  };
   try {
     body = await req.json();
   } catch {
@@ -30,6 +36,15 @@ export async function POST(req: NextRequest) {
     (MODES as string[]).includes(body.mode)
       ? (body.mode as AgentMode)
       : "general";
+
+  // Explicit model selection (like Freebuff's model picker). "auto" walks
+  // the cascade; anything else must name one of the four providers.
+  const provider: ProviderPreference =
+    typeof body.provider === "string"
+      ? (PROVIDERS as string[]).includes(body.provider)
+        ? (body.provider as ProviderPreference)
+        : "auto"
+      : "auto";
 
   if (!message) {
     return NextResponse.json(
@@ -86,7 +101,7 @@ export async function POST(req: NextRequest) {
   }
 
   console.log(
-    JSON.stringify({ event: "agent_started", user: user.id, mode })
+    JSON.stringify({ event: "agent_started", user: user.id, mode, provider })
   );
 
   try {
@@ -96,6 +111,7 @@ export async function POST(req: NextRequest) {
       message,
       conversationId,
       mode,
+      preferredProvider: provider,
     });
 
     const response: AgentResponseBody = {

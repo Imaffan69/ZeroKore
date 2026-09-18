@@ -9,6 +9,7 @@ import type {
   AgentMode,
   Artifact,
   ChatMessage,
+  ProviderPreference,
 } from "@/types";
 import {
   chatWithCascade,
@@ -56,6 +57,8 @@ export interface AgentRunInput {
   message: string;
   conversationId: string | null;
   mode: AgentMode;
+  /** Explicit model choice from the model picker; null/"auto" = cascade. */
+  preferredProvider?: ProviderPreference | null;
 }
 
 export interface AgentRunResult {
@@ -76,6 +79,7 @@ function makeTitle(message: string): string {
 
 export async function runAgent(input: AgentRunInput): Promise<AgentRunResult> {
   const { supabase, userId, message, mode } = input;
+  const preferred = input.preferredProvider ?? "auto";
   const events: AgentEvent[] = [event("agent_started", "[Agent Started]")];
   const tavilyAvailable = !!process.env.TAVILY_API_KEY;
   const specs: ToolSpec[] = toolSpecs(tavilyAvailable);
@@ -172,7 +176,10 @@ export async function runAgent(input: AgentRunInput): Promise<AgentRunResult> {
   const allToolCalls: any[] = [];
 
   for (let i = 0; i < MAX_TOOL_ITERATIONS; i++) {
-    const turn = await chatWithCascade(messages, { tools: specs });
+    const turn = await chatWithCascade(messages, {
+      tools: specs,
+      preferred,
+    });
     provider = turn.provider;
     if (turn.fallbackFrom && !fallbackFrom) {
       fallbackFrom = turn.fallbackFrom;
@@ -239,7 +246,7 @@ export async function runAgent(input: AgentRunInput): Promise<AgentRunResult> {
       lastCalls.length > 0 &&
       lastCalls.every((n) => n === "store_memory" || n === "search_memory")
     ) {
-      const follow = await chatWithCascade(messages);
+      const follow = await chatWithCascade(messages, { preferred });
       provider = follow.provider;
       if (follow.fallbackFrom && !fallbackFrom) {
         fallbackFrom = follow.fallbackFrom;

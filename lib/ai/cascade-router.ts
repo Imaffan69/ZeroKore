@@ -1,7 +1,10 @@
 /**
- * ZeroKore AI cascade router.
- * Tries providers in order: Groq → DeepSeek → SambaNova → Gemini.
- * Falls back on 429 / 5xx / auth-config errors / timeout / network errors.
+ * ZeroKore AI model registry + cascade router.
+ *
+ * Four providers: Groq → DeepSeek → SambaNova → Gemini.
+ * - "auto" preference walks the cascade in order (only on retryable errors).
+ * - An explicit preference pins ONE provider: it is tried alone and its
+ *   failures surface to the user instead of silently switching models.
  * Fails fast on 400 (malformed internal request = our bug, not the provider's).
  * Server-side only. Never logs or returns API keys.
  */
@@ -43,6 +46,17 @@ interface ProviderDef {
   apiKey: string | undefined;
 }
 
+/** Stable id used in the UI model picker. */
+export type ProviderId = "Groq" | "DeepSeek" | "SambaNova" | "Gemini";
+
+/** Registry rows for the model picker (availability resolved separately). */
+export const MODEL_REGISTRY: { id: ProviderId; label: string; model: string }[] = [
+  { id: "Groq", label: "Groq · GPT-OSS 120B", model: "openai/gpt-oss-120b" },
+  { id: "DeepSeek", label: "DeepSeek · deepseek-chat", model: "deepseek-chat" },
+  { id: "SambaNova", label: "SambaNova · Llama 3.3 70B", model: "Meta-Llama-3.3-70B-Instruct" },
+  { id: "Gemini", label: "Gemini · Flash", model: "gemini-3.6-flash" },
+];
+
 function providers(): ProviderDef[] {
   return [
     {
@@ -77,6 +91,22 @@ export function configuredProviders(): string[] {
   return providers()
     .filter((p) => !!p.apiKey)
     .map((p) => p.name);
+}
+
+/** Model-picker rows for the client: which of the four providers have keys. */
+export function providerCatalog(): {
+  id: string;
+  label: string;
+  model: string;
+  configured: boolean;
+}[] {
+  const defs = providers();
+  return MODEL_REGISTRY.map((entry) => ({
+    id: entry.id,
+    label: entry.label,
+    model: entry.model,
+    configured: defs.some((d) => d.name === entry.id && !!d.apiKey),
+  }));
 }
 
 class RetryableError extends Error {
@@ -320,11 +350,19 @@ const OPENAI_BASES: Record<string, string> = {
 
 /**
  * Run one chat turn across the cascade. Returns the first successful result.
- * Throws a clean, user-safe error when every configured provider fails.
+ *
+ * `preferred` pins an exact provider (model selection like Freebuff/v0):
+ * only that provider runs; its failure is returned as a clean, user-safe
+ * error so the user can retry or pick another model — never a silent switch.
+ * "auto" (the default) walks the configured cascade in order.
  */
 export async function chatWithCascade(
   messages: ChatMsg[],
-  opts?: { tools?: ToolSpec[]; timeoutMs?: number }
+  opts?: {
+    tools?: ToolSpec[];
+    timeoutMs?: number;
+    preferred?: string | null;
+  }
 ): Promise<CascadeResult> {
   const timeoutMs = opts?.timeoutMs ?? 60000;
   const all = providers();
@@ -334,6 +372,46 @@ export async function chatWithCascade(
     throw new FatalError(
       "No AI provider is configured. Set at least one provider API key on the server."
     );
+  }
+
+  // Explicit model selection: run ONLY the chosen provider.
+  if (opts?.preferred && opts.preferred !== "auto") {
+    const picked = all.find(
+      (p) => p.name.toLowerCase() === opts.preferred!.toLowerCase()
+    );
+    if (!picked) {
+      throw new FatalError(`Unknown model "${opts.preferred}".`);
+    }
+    if (!picked.apiKey) {
+      throw new FatalError(
+        `${picked.name} is not configured on the server. Pick another model or add the ${picked.name} API key.`
+      );
+    }
+    try {
+      const result =
+        picked.name === "Gemini"
+          ? await callGemini(picked.apiKey, picked.model, messages, opts?.tools, timeoutMs)
+          : await callOpenAICompatible(
+              OPENAI_BASES[picked.name],
+              picked.apiKey,
+              picked.model,
+              messages,
+              opts?.tools,
+              timeoutMs
+            );
+      console.log(
+        JSON.stringify({ event: "provider_pinned", provider: picked.name })
+      );
+      return { ...result, provider: picked.name };
+    } catch (err) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : `${picked.name} request failed.`;
+      throw new RetryableError(
+        `${picked.name} could not complete the request. ${msg} You can retry or pick another model.`
+      );
+    }
   }
 
   let firstTried: string | null = null;

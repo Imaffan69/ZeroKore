@@ -1,5 +1,10 @@
 export type AgentMode = "coding" | "research" | "general";
 
+/** The four configured AI providers. Users may pin one explicitly. */
+export type ProviderName = "Groq" | "DeepSeek" | "SambaNova" | "Gemini";
+
+export type ProviderPreference = ProviderName | "auto";
+
 export type AgentEventKind =
   | "agent_started"
   | "memory_retrieved"
@@ -65,6 +70,23 @@ export interface AgentRequestBody {
   message: string;
   conversationId?: string | null;
   mode: AgentMode;
+  /** Explicit model/provider choice. "auto" uses the cascade order. */
+  provider?: ProviderPreference;
+}
+
+/** A provider row in the model picker: availability comes from /api/health. */
+export interface ProviderInfo {
+  id: ProviderName;
+  label: string;
+  model: string;
+  configured: boolean;
+}
+
+/** Persisted UI/project preferences (localStorage on the client). */
+export interface ProjectPreferences {
+  projectName: string;
+  preferredProvider: ProviderPreference;
+  reducedMotion: boolean;
 }
 
 export interface AgentResponseBody {
@@ -100,6 +122,12 @@ export interface MemoryRecord {
   id: string;
   content: string;
   created_at: string;
+}
+
+export interface GitHubStatus {
+  connected: boolean;
+  configured: boolean;
+  user?: string | null;
 }
 
 /** Summary of a skill committed at `.claude/skills/<name>/SKILL.md`. */
