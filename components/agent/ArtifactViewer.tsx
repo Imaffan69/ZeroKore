@@ -5,32 +5,9 @@ import { motion } from "framer-motion";
 import { FileCode2, Copy, Check, Eye, Code2, BookOpen } from "lucide-react";
 import type { Artifact } from "@/types";
 import { cn } from "@/lib/utils";
+import { renderSafeMarkdown } from "@/lib/markdown";
 
 type Tab = "preview" | "code" | "markdown";
-
-function escapeHtmlSrc(s: string): string {
-  const AMP = "&" + "amp;";
-  const LT = "&" + "lt;";
-  const GT = "&" + "gt;";
-  return s.split("&").join(AMP).split("<").join(LT).split(">").join(GT);
-}
-
-/** Safe inline markdown for the markdown tab (escaped first). */
-function renderMarkdownSafe(text: string): string {
-  let out = escapeHtmlSrc(text);
-  out = out.replace(/^### (.*)$/gm, "<h4>$1</h4>");
-  out = out.replace(/^## (.*)$/gm, "<h3>$1</h3>");
-  out = out.replace(/^# (.*)$/gm, "<h2>$1</h2>");
-  out = out.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
-  out = out.replace(/`([^`]+)`/g, "<code>$1</code>");
-  out = out.replace(
-    /\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,
-    '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
-  );
-  out = out.replace(/^[-*] (.*)$/gm, "<li>$1</li>");
-  out = out.replace(/\n/g, "<br/>");
-  return out;
-}
 
 export default function ArtifactViewer({
   artifact,
@@ -197,19 +174,19 @@ export default function ArtifactViewer({
             className="h-full min-h-[320px] w-full border-0 bg-white"
           />
         ) : null}
-        {activeTab === "code" && (
+        {activeTab === "code" ? (
           <pre className="max-w-full overflow-x-auto p-3 font-mono text-xs leading-relaxed text-emerald-100">
             <code>{artifact.content}</code>
           </pre>
-        )}
-        {activeTab === "markdown" && showMarkdownTab && (
+        ) : null}
+        {activeTab === "markdown" && showMarkdownTab ? (
           <div
             className="kore-prose max-w-full p-4 text-sm leading-relaxed [&_a]:text-kore-accent [&_a]:underline [&_code]:rounded [&_code]:bg-kore-panel [&_code]:px-1 [&_code]:text-[0.85em] [&_code]:text-emerald-200 [&_h2]:text-lg [&_h2]:font-bold [&_h2]:text-white [&_h3]:text-base [&_h3]:font-bold [&_h3]:text-white [&_h4]:font-bold [&_h4]:text-white [&_li]:ml-4 [&_li]:list-disc [&_strong]:text-white"
             dangerouslySetInnerHTML={{
-              __html: renderMarkdownSafe(artifact.content),
+              __html: renderSafeMarkdown(artifact.content),
             }}
           />
-        )}
+        ) : null}
       </div>
     </motion.div>
   );

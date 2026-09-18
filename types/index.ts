@@ -101,3 +101,22 @@ export interface MemoryRecord {
   content: string;
   created_at: string;
 }
+
+/** Summary of a skill committed at `.claude/skills/<name>/SKILL.md`. */
+export interface SkillSummary {
+  /** Directory slug, also the `/invoke` name. */
+  name: string;
+  /** Display name from frontmatter, falling back to a humanised slug. */
+  title: string;
+  description: string;
+  bytes: number;
+  resourceCount: number;
+}
+
+/** A skill plus its full markdown body and supporting files. */
+export interface SkillDetail extends SkillSummary {
+  /** Markdown body with frontmatter removed. */
+  content: string;
+  /** Relative paths of files that ship alongside SKILL.md. */
+  resourceNames: string[];
+}

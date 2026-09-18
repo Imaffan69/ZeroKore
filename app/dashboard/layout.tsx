@@ -41,7 +41,9 @@ export default async function DashboardLayout({
     authed = false;
   }
 
-  if (!authed) redirect("/login");
+  // Preserve where the user was heading so sign-in returns them here.
+  // `AuthForm` reads `?next=` and navigates to it after a successful login.
+  if (!authed) redirect(`/login?next=${encodeURIComponent("/dashboard")}`);
 
   return (
     <div className="flex h-dvh overflow-hidden bg-kore-bg text-kore-text">

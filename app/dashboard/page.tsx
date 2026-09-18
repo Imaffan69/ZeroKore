@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import Sidebar, { type SidebarView } from "@/components/layout/Sidebar";
 import Header from "@/components/layout/Header";
+import SkillsPanel from "@/components/skills/SkillsPanel";
 import ExecutionTerminal from "@/components/agent/ExecutionTerminal";
 import ArtifactViewer from "@/components/agent/ArtifactViewer";
 import DualPanelCanvas from "@/components/agent/DualPanelCanvas";
@@ -32,6 +33,12 @@ import type {
   MemoryRecord,
   UsageState,
 } from "@/types";
+
+const VIEW_TITLE: Record<Exclude<SidebarView, "workspace">, string> = {
+  skills: "Skills",
+  memory: "Memory",
+  settings: "Settings",
+};
 
 const SUGGESTIONS = [
   {
@@ -474,7 +481,7 @@ export default function DashboardPage() {
       <div className="flex min-w-0 flex-1 flex-col">
         <Header
           onMenu={() => setSidebarOpen(true)}
-          title={view === "workspace" ? activeTitle : view === "memory" ? "Memory" : "Settings"}
+          title={view === "workspace" ? activeTitle : VIEW_TITLE[view]}
           mode={mode}
           status={loading ? "loading" : error ? "error" : "idle"}
           provider={providerFallback ? `${providerFallback} → ${provider}` : provider}
@@ -507,6 +514,18 @@ export default function DashboardPage() {
               onModeChange={setMode}
             />
           </>
+        )}
+
+        {view === "skills" && (
+          <SkillsPanel
+            onUseSkill={(name) => {
+              setInput(`/${name} `);
+              setView("workspace");
+              setTimeout(() => {
+                document.getElementById("kore-input")?.focus();
+              }, 50);
+            }}
+          />
         )}
 
         {view === "memory" && (

@@ -16,7 +16,11 @@ import {
   type ToolSpec,
 } from "./cascade-router";
 import { executeTool, toolSpecs, type ToolContext } from "./tools";
-import { embedText, searchSimilarMemories } from "./memory";
+import {
+  embedText,
+  searchSimilarMemories,
+  keywordSearchMemories,
+} from "./memory";
 
 export const MAX_TOOL_ITERATIONS = 8;
 const HISTORY_LIMIT = 30;
@@ -119,12 +123,18 @@ export async function runAgent(input: AgentRunInput): Promise<AgentRunResult> {
   // --- Memory recall (graceful: continue without memory on failure) ---
   let memoryBlock = "";
   try {
-    const hits = await searchSimilarMemories(
+    let hits = await searchSimilarMemories(
       supabase,
       userId,
       embedText(message),
       5
     );
+    // Vector recall can come back empty when the pgvector index is missing or
+    // the embedding distance never clears the threshold. Fall back to keyword
+    // matching so an otherwise valid request still gets its context.
+    if (hits.length === 0) {
+      hits = await keywordSearchMemories(supabase, userId, message, 5);
+    }
     if (hits.length > 0) {
       events.push(event("memory_retrieved", "[Memory Retrieved]"));
       memoryBlock = `Relevant long-term memory about this user:\n${hits

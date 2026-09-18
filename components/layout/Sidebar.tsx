@@ -11,13 +11,14 @@ import {
   Code2,
   Search,
   MessagesSquare,
+  Sparkles,
   Trash2,
   X,
 } from "lucide-react";
 import type { AgentMode, Conversation, UsageState } from "@/types";
 import { cn } from "@/lib/utils";
 
-export type SidebarView = "workspace" | "memory" | "settings";
+export type SidebarView = "workspace" | "skills" | "memory" | "settings";
 
 interface SidebarProps {
   open: boolean;
@@ -332,6 +333,7 @@ export default function Sidebar(props: SidebarProps) {
           {/* Views */}
           <div className="space-y-1">
             {[
+              { id: "skills" as const, label: "Skills", icon: Sparkles },
               { id: "memory" as const, label: "Memory", icon: BrainCircuit },
               { id: "settings" as const, label: "Settings", icon: Settings },
             ].map((v, i) => (
