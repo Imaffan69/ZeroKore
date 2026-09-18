@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { useRef } from "react";
-import { Send, Square, Plus, Code2, Search, MessagesSquare } from "lucide-react";
+import { Send, Square, Plus, Code2, Search, MessagesSquare, ChevronDown, Zap } from "lucide-react";
 import type { AgentMode } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -16,6 +16,11 @@ interface ToolBarProps {
   limitReached: boolean;
   mode: AgentMode;
   onModeChange: (m: AgentMode) => void;
+  /** Currently selected model preference ("auto" or a provider id). */
+  model: string;
+  /** Available models with server-side key status. */
+  models: { id: string; label: string; configured: boolean }[];
+  onModelChange: (m: string) => void;
 }
 
 const MODES: { id: AgentMode; label: string; icon: typeof Code2 }[] = [
@@ -34,6 +39,9 @@ export default function ToolBar({
   limitReached,
   mode,
   onModeChange,
+  model,
+  models,
+  onModelChange,
 }: ToolBarProps) {
   const taRef = useRef<HTMLTextAreaElement>(null);
 
@@ -65,7 +73,7 @@ export default function ToolBar({
           conversation and typed input are preserved.
         </motion.p>
       )}
-      <div className="mb-2 flex items-center gap-1.5" role="group" aria-label="Agent mode">
+      <div className="mb-2 flex flex-wrap items-center gap-1.5" role="group" aria-label="Agent mode">
         {MODES.map((m) => (
           <motion.button
             key={m.id}
@@ -84,6 +92,35 @@ export default function ToolBar({
             {m.label}
           </motion.button>
         ))}
+
+        {/* Model selector — lives in the chat like Freebuff/v0 */}
+        <div className="relative ml-auto" role="group" aria-label="Model selection">
+          <label htmlFor="kore-model" className="sr-only">
+            Model
+          </label>
+          <Zap
+            className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-kore-muted"
+            aria-hidden
+          />
+          <ChevronDown
+            className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-kore-muted"
+            aria-hidden
+          />
+          <select
+            id="kore-model"
+            value={model}
+            onChange={(e) => onModelChange(e.target.value)}
+            className="appearance-none rounded-md border border-kore-border bg-kore-bg/80 py-1.5 pl-7 pr-7 font-mono text-xs text-kore-text transition hover:border-white/25 focus:border-white/50"
+          >
+            <option value="auto">Auto</option>
+            {models.map((m) => (
+              <option key={m.id} value={m.id} disabled={!m.configured}>
+                {m.label}
+                {!m.configured ? " (no key)" : ""}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
       <div className="flex items-end gap-2">
         <label htmlFor="kore-input" className="sr-only">
@@ -122,7 +159,7 @@ export default function ToolBar({
             whileTap={{ scale: 0.97 }}
             onClick={onSend}
             disabled={!value.trim() || limitReached}
-            className="glass-interactive flex h-11 shrink-0 items-center gap-1.5 rounded-full bg-kore-accent px-4 text-sm font-semibold text-black shadow-glow transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
+            className="glass-interactive flex h-11 shrink-0 items-center gap-1.5 rounded-full bg-kore-accent px-4 text-sm font-semibold text-black shadow-glow transition hover:bg-white/85 disabled:cursor-not-allowed disabled:opacity-40"
             aria-label="Send message"
           >
             <Send className="h-4 w-4" aria-hidden />

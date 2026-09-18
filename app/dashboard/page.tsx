@@ -13,6 +13,9 @@ import {
   PenTool,
   ArrowRight,
   BrainCircuit,
+  Github,
+  FolderPlus,
+  FolderOpen,
 } from "lucide-react";
 import Sidebar, { type SidebarView } from "@/components/layout/Sidebar";
 import Header from "@/components/layout/Header";
@@ -37,6 +40,7 @@ import type {
   ChatMessage,
   Conversation,
   MemoryRecord,
+  ProviderInfo,
   ProviderPreference,
   UsageState,
 } from "@/types";
@@ -97,6 +101,7 @@ export default function DashboardPage() {
   const [memories, setMemories] = useState<MemoryRecord[]>([]);
   const [toast, setToast] = useState<string | null>(null);
   const [preferences, setPreferences] = useState(DEFAULT_PREFERENCES);
+  const [modelCatalog, setModelCatalog] = useState<ProviderInfo[]>([]);
 
   const abortRef = useRef<AbortController | null>(null);
   const inputRef = useRef<string>("");
@@ -147,6 +152,7 @@ export default function DashboardPage() {
           if (Array.isArray(data.providers) && data.providers[0] && data.providers[0] !== "none configured") {
             setProvider(data.providers[0]);
           }
+          if (Array.isArray(data.models)) setModelCatalog(data.models as ProviderInfo[]);
         }
       } catch {
         // Offline-tolerant: workspace still renders.
@@ -441,10 +447,64 @@ export default function DashboardPage() {
         </p>
       </motion.div>
 
+        {/* Freebuff-style primary actions */}
       <motion.div
         initial="hidden"
         animate="visible"
-        variants={staggerGroup(0.06, 0.18)}
+        variants={staggerGroup(0.07, 0.22)}
+        className="mt-8 grid w-full max-w-2xl grid-cols-1 gap-2.5 sm:grid-cols-3"
+      >
+        {[
+          {
+            icon: FolderPlus,
+            label: "Start a project",
+            desc: "Describe something new to build",
+            onClick: () => {
+              setInput("");
+              document.getElementById("kore-input")?.focus();
+            },
+          },
+          {
+            icon: FolderOpen,
+            label: "Continue a project",
+            desc: "Pick up where you left off",
+            onClick: () => {
+              setView("workspace");
+              if (conversations.length > 0) openConversation(conversations[0].id);
+              else document.getElementById("kore-input")?.focus();
+            },
+          },
+          {
+            icon: Github,
+            label: "Connect GitHub",
+            desc: "Sync repos, commits and PRs",
+            onClick: () => {
+              setView("settings");
+            },
+          },
+        ].map((a) => (
+          <motion.button
+            key={a.label}
+            variants={fadeUp}
+            whileHover={hoverLift}
+            whileTap={press}
+            transition={{ duration: 0.18, ease: EASE }}
+            onClick={a.onClick}
+            className="glass glass-sheen glass-interactive flex flex-col items-start gap-1.5 rounded-2xl px-4 py-3.5 text-left"
+          >
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-kore-border bg-white/[0.04]">
+              <a.icon className="h-4 w-4 text-white" aria-hidden />
+            </span>
+            <span className="text-sm font-semibold text-white">{a.label}</span>
+            <span className="text-xs leading-snug text-kore-muted">{a.desc}</span>
+          </motion.button>
+        ))}
+      </motion.div>
+
+      <motion.div
+        initial="hidden"
+        animate="visible"
+        variants={staggerGroup(0.06, 0.3)}
         className="mt-6 grid w-full max-w-lg grid-cols-1 gap-2 sm:grid-cols-2"
       >
         {SUGGESTIONS.map((s) => (
@@ -537,6 +597,16 @@ export default function DashboardPage() {
               limitReached={limitReached}
               mode={mode}
               onModeChange={setMode}
+              model={preferences.preferredProvider}
+              models={modelCatalog.map((m) => ({ id: m.id, label: m.label, configured: m.configured }))}
+              onModelChange={(m) => {
+                updatePreferences({ preferredProvider: m as ProviderPreference });
+                showToast(
+                  m === "auto"
+                    ? "Model set to Auto (fastest available)."
+                    : `Model set to ${m}.`
+                );
+              }}
             />
           </>
         )}

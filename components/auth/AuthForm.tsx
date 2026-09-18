@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Terminal, Loader2, AlertCircle, ShieldCheck } from "lucide-react";
+import { Terminal, Loader2, AlertCircle, ShieldCheck, Github, Mail } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -51,6 +51,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
   const [info, setInfo] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [configured, setConfigured] = useState(true);
+  const [oauthBusy, setOauthBusy] = useState<"google" | "github" | null>(null);
 
   const isSignup = mode === "signup";
 
@@ -142,6 +143,41 @@ export default function AuthForm({ mode }: { mode: Mode }) {
     }
   }
 
+  async function handleOAuth(provider: "google" | "github") {
+    setError(null);
+    setInfo(null);
+    if (!configured) {
+      setError(
+        "Authentication is not configured on this deployment yet. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to the server environment, then reload."
+      );
+      return;
+    }
+    setOauthBusy(provider);
+    try {
+      const { error: oauthError } = await supabaseSignIn(provider);
+      if (oauthError) {
+        setError(
+          provider === "google"
+            ? "Google sign-in is not enabled yet. Enable the Google provider in Supabase Auth settings."
+            : "GitHub sign-in is not enabled yet. Enable the GitHub provider in Supabase Auth settings."
+        );
+      }
+      // On success the browser redirects to the provider, then back here.
+    } catch {
+      setError("Could not start the sign-in flow. Check your connection.");
+    } finally {
+      setOauthBusy(null);
+    }
+  }
+
+  async function supabaseSignIn(provider: "google" | "github") {
+    const supabase = createClient();
+    return supabase.auth.signInWithOAuth({
+      provider,
+      options: { redirectTo: `${window.location.origin}${next}` },
+    });
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -188,7 +224,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
       {configured && info && (
         <div
           role="status"
-          className="mb-4 rounded-xl border border-kore-accent/40 bg-kore-accent/10 px-3 py-2.5 text-sm text-emerald-300"
+          className="mb-4 rounded-xl border border-kore-accent/40 bg-kore-accent/10 px-3 py-2.5 text-sm text-white"
         >
           {info}
         </div>
@@ -248,7 +284,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
         <button
           type="submit"
           disabled={loading}
-          className="glass-interactive flex w-full items-center justify-center gap-2 rounded-full bg-kore-accent px-4 py-2.5 font-semibold text-black shadow-glow transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+          className="glass-interactive flex w-full items-center justify-center gap-2 rounded-full bg-kore-accent px-4 py-2.5 font-semibold text-black shadow-glow transition hover:bg-white/85 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {loading && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
           {loading
@@ -260,6 +296,50 @@ export default function AuthForm({ mode }: { mode: Mode }) {
               : "Login"}
         </button>
       </form>
+
+      {/* OAuth providers */}
+      <div className="my-5 flex items-center gap-3" aria-hidden>
+        <span className="h-px flex-1 bg-kore-border" />
+        <span className="text-xs text-kore-muted">or continue with</span>
+        <span className="h-px flex-1 bg-kore-border" />
+      </div>
+      <div className="grid grid-cols-2 gap-2.5">
+        <motion.button
+          type="button"
+          whileHover={{ translateY: -1 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={() => handleOAuth("google")}
+          disabled={oauthBusy !== null || loading}
+          className="glass glass-interactive flex items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium text-kore-text transition hover:text-white disabled:opacity-60"
+        >
+          {oauthBusy === "google" ? (
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+          ) : (
+            <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
+              <path fill="#EA4335" d="M12 5.04c1.62 0 3.06.56 4.2 1.64l3.12-3.12C17.46 1.8 14.96.75 12 .75 7.62.75 3.84 3.27 2.04 6.86l3.66 2.84C6.6 7.02 9.05 5.04 12 5.04z"/>
+              <path fill="#4285F4" d="M23.25 12.27c0-.93-.08-1.6-.26-2.31H12v4.19h6.44c-.13 1.08-.83 2.7-2.39 3.79l3.57 2.77c2.14-1.97 3.63-4.88 3.63-8.44z"/>
+              <path fill="#FBBC05" d="M5.71 14.3A6.9 6.9 0 0 1 5.33 12c0-.8.14-1.57.36-2.3L2.03 6.86A11.24 11.24 0 0 0 .75 12c0 1.81.44 3.52 1.28 5.14l3.68-2.84z"/>
+              <path fill="#34A853" d="M12 23.25c3.04 0 5.6-1 7.46-2.72l-3.57-2.77c-.95.66-2.23 1.12-3.89 1.12-2.95 0-5.4-1.98-6.3-4.66l-3.66 2.84c1.8 3.59 5.58 6.19 9.96 6.19z"/>
+            </svg>
+          )}
+          Google
+        </motion.button>
+        <motion.button
+          type="button"
+          whileHover={{ translateY: -1 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={() => handleOAuth("github")}
+          disabled={oauthBusy !== null || loading}
+          className="glass glass-interactive flex items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium text-kore-text transition hover:text-white disabled:opacity-60"
+        >
+          {oauthBusy === "github" ? (
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+          ) : (
+            <Github className="h-4 w-4" aria-hidden />
+          )}
+          GitHub
+        </motion.button>
+      </div>
 
       <p className="mt-5 text-center text-sm text-kore-muted">
         {isSignup ? (
@@ -281,6 +361,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
 
       <p className="mt-4 flex items-center justify-center gap-1.5 text-center text-xs text-kore-muted/70">
         <ShieldCheck className="h-3.5 w-3.5" aria-hidden />
+        <Mail className="hidden" aria-hidden />
         Passwords are hashed by Supabase Auth. ZeroKore never sees them.
       </p>
     </motion.div>

@@ -69,7 +69,7 @@ const EVENT_STYLE: Record<AgentEvent["kind"], string> = {
   tool_call: "text-kore-warn",
   tool_completed: "text-kore-muted",
   provider_fallback: "text-kore-warn",
-  generating_artifact: "text-emerald-300",
+  generating_artifact: "text-white",
   completed: "text-kore-accent",
   error: "text-kore-danger",
 };
@@ -121,7 +121,7 @@ export default function ExecutionTerminal({
               <p className="whitespace-pre-wrap break-words">{msg.content}</p>
             ) : (
               <div
-                className="kore-prose [&_a]:text-kore-accent [&_a]:underline [&_code]:rounded [&_code]:bg-kore-panel [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[0.82em] [&_code]:text-emerald-200 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_strong]:text-white"
+                className="kore-prose [&_a]:text-kore-accent [&_a]:underline [&_code]:rounded [&_code]:bg-kore-panel [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[0.82em] [&_code]:text-white/90 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_strong]:text-white"
                 dangerouslySetInnerHTML={{ __html: renderSafe(msg.content) }}
               />
             )}

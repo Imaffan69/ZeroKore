@@ -54,7 +54,7 @@ export const MODEL_REGISTRY: { id: ProviderId; label: string; model: string }[] 
   { id: "Groq", label: "Groq · GPT-OSS 120B", model: "openai/gpt-oss-120b" },
   { id: "DeepSeek", label: "DeepSeek · deepseek-chat", model: "deepseek-chat" },
   { id: "SambaNova", label: "SambaNova · Llama 3.3 70B", model: "Meta-Llama-3.3-70B-Instruct" },
-  { id: "Gemini", label: "Gemini · Flash", model: "gemini-3.6-flash" },
+  { id: "Gemini", label: "Gemini · 2.5 Flash", model: "gemini-2.5-flash" },
 ];
 
 function providers(): ProviderDef[] {
@@ -80,8 +80,8 @@ function providers(): ProviderDef[] {
     },
     {
       name: "Gemini",
-      // gemini-2.5-flash was retired by Google; gemini-3.6-flash is live.
-      model: "gemini-3.6-flash",
+      // gemini-2.5-flash is the current live, GA chat model on the Gemini API.
+      model: "gemini-2.5-flash",
       apiKey: process.env.GEMINI_API_KEY,
     },
   ];
