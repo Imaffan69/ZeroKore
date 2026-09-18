@@ -32,15 +32,21 @@ body {
 /* Scrollbars */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #1e293b transparent;
+  scrollbar-color: #262b36 transparent;
 }
 *::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
 }
 *::-webkit-scrollbar-thumb {
-  background: #1e293b;
-  border-radius: 8px;
+  background: #262b36;
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: 10px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: #38404f;
+  background-clip: content-box;
 }
 *::-webkit-scrollbar-track {
   background: transparent;
@@ -207,15 +213,36 @@ body {
   }
 }
 
-/* Smooth, muted motion for hover/active lifts on glass */
-glass-interactive {
-  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1),
-              box-shadow 0.25s cubic-bezier(0.22, 1, 0.36, 1),
-              border-color 0.25s ease;
+/* Refined hairline highlight for bordered surfaces */
+.glass-hairline {
+  position: relative;
 }
+.glass-hairline::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  pointer-events: none;
+}
+
+/* Text selection reads as part of the monochrome system */
+::selection {
+  background: rgba(16, 185, 129, 0.28);
+  color: #ffffff;
+}
+
+/* Numeric/tabular alignment for metrics and terminals */
+.kore-tabular {
+  font-variant-numeric: tabular-nums;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .kore-fade-in > * {
     animation: none;
     opacity: 1;
+  }
+  .kore-grid-bg {
+    mask-image: none;
   }
 }
