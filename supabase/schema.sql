@@ -226,3 +226,141 @@ as $$
   order by m.embedding <=> p_embedding
   limit greatest(1, least(p_limit, 20));
 $$;
+
+-- ============================================================
+-- projects: the workspace unit. Created here, imported from GitHub,
+-- or continued. Each project owns files, environments and secrets.
+-- ============================================================
+create table if not exists public.projects (
+  id uuid primary key default uuid_generate_v4(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  -- URL-safe identifier: /projects/<slug>
+  slug text not null,
+  name text not null,
+  description text not null default '',
+  -- How the project entered ZeroKore.
+  source text not null default 'created'
+    check (source in ('created', 'github', 'imported')),
+  github_repo text,
+  github_branch text,
+  status text not null default 'active'
+    check (status in ('active', 'archived')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (user_id, slug)
+);
+create index if not exists projects_user_idx
+  on public.projects (user_id, updated_at desc);
+
+-- ------------------------------------------------------------
+-- project_files: the project's real file tree, edited in the code editor.
+-- ------------------------------------------------------------
+create table if not exists public.project_files (
+  id uuid primary key default uuid_generate_v4(),
+  project_id uuid not null references public.projects (id) on delete cascade,
+  path text not null,
+  content text not null default '',
+  language text not null default 'plaintext',
+  updated_at timestamptz not null default now(),
+  unique (project_id, path)
+);
+create index if not exists project_files_project_idx
+  on public.project_files (project_id, path);
+
+-- ------------------------------------------------------------
+-- project_environments: the named surfaces of a project (the old
+-- "artifact" concept, project-scoped and split by kind).
+-- 'preview'    — rendered html/svg output, shown in a sandboxed frame
+-- 'terminal'   — command transcript (real output only, never simulated)
+-- 'dev_server' — dev server binding/status for the project
+-- 'secrets'    — key/value environment variables (values never leave the server)
+-- ------------------------------------------------------------
+create table if not exists public.project_environments (
+  id uuid primary key default uuid_generate_v4(),
+  project_id uuid not null references public.projects (id) on delete cascade,
+  kind text not null
+    check (kind in ('preview', 'terminal', 'dev_server', 'secrets')),
+  label text not null default '',
+  content text not null default '',
+  language text not null default 'html',
+  -- Server-owned state (status, port, last run). Never trusted from the client.
+  state jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (project_id, kind)
+);
+create index if not exists project_environments_project_idx
+  on public.project_environments (project_id, kind);
+
+-- ------------------------------------------------------------
+-- project_secrets: environment variables for a project.
+-- Server-only: encrypted at rest, and RLS has NO client policies, so a
+-- browser session can never read a value back (same model as
+-- github_connections). The UI sees key names only.
+-- ------------------------------------------------------------
+create table if not exists public.project_secrets (
+  id uuid primary key default uuid_generate_v4(),
+  project_id uuid not null references public.projects (id) on delete cascade,
+  key text not null,
+  -- AES-256-GCM ciphertext (iv:tag:data), written only by the server.
+  value_encrypted text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (project_id, key)
+);
+
+alter table public.projects enable row level security;
+alter table public.project_files enable row level security;
+alter table public.project_environments enable row level security;
+alter table public.project_secrets enable row level security;
+
+-- projects: full owner CRUD.
+drop policy if exists "projects_owner_all" on public.projects;
+create policy "projects_owner_all" on public.projects
+  for all using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+-- project_files: allowed only inside projects owned by the caller.
+drop policy if exists "project_files_owner_all" on public.project_files;
+create policy "project_files_owner_all" on public.project_files
+  for all using (
+    exists (
+      select 1 from public.projects p
+      where p.id = project_files.project_id and p.user_id = auth.uid()
+    )
+  )
+  with check (
+    exists (
+      select 1 from public.projects p
+      where p.id = project_files.project_id and p.user_id = auth.uid()
+    )
+  );
+
+-- project_environments: same ownership rule.
+drop policy if exists "project_environments_owner_all"
+  on public.project_environments;
+create policy "project_environments_owner_all" on public.project_environments
+  for all using (
+    exists (
+      select 1 from public.projects p
+      where p.id = project_environments.project_id and p.user_id = auth.uid()
+    )
+  )
+  with check (
+    exists (
+      select 1 from public.projects p
+      where p.id = project_environments.project_id and p.user_id = auth.uid()
+    )
+  );
+
+-- project_secrets: intentionally NO client policies (server-only access).
+
+-- ------------------------------------------------------------
+-- conversations can belong to a project. Nullable: a standalone chat
+-- (the previous behaviour) stays valid and keeps working.
+-- ------------------------------------------------------------
+alter table public.conversations
+  add column if not exists project_id uuid
+  references public.projects (id) on delete set null;
+create index if not exists conversations_project_idx
+  on public.conversations (project_id, created_at desc);

@@ -242,7 +242,7 @@ export default function LandingPage() {
     <div className="relative min-h-screen overflow-x-hidden bg-kore-bg text-kore-text">
       {/* Ambient backdrop */}
       <div
-        className="kore-grid-bg pointer-events-none fixed inset-0 z-0"
+        className="kore-ambient pointer-events-none fixed inset-0 z-0"
         aria-hidden
       />
       <div

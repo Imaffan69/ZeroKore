@@ -16,7 +16,7 @@ export default function LegalPage({
 }) {
   return (
     <main className="relative min-h-screen bg-kore-bg text-kore-text">
-      <div className="kore-grid-bg pointer-events-none absolute inset-0" aria-hidden />
+      <div className="kore-ambient pointer-events-none absolute inset-0" aria-hidden />
       <div className="relative z-10 mx-auto w-full max-w-3xl px-4 py-10 sm:px-6 sm:py-14">
         <div className="mb-8 flex items-center justify-between">
           <Link

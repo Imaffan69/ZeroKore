@@ -9,7 +9,7 @@ export default function AuthLayout({
 }) {
   return (
     <main className="relative flex min-h-screen flex-col bg-kore-bg text-kore-text">
-      <div className="kore-grid-bg pointer-events-none absolute inset-0" aria-hidden />
+      <div className="kore-ambient pointer-events-none absolute inset-0" aria-hidden />
       <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pt-5 sm:px-6">
         <Link
           href="/"

@@ -17,7 +17,7 @@ export default function GlobalError({
 
   return (
     <main className="relative flex min-h-screen flex-col items-center justify-center bg-kore-bg px-4 text-kore-text">
-      <div className="kore-grid-bg pointer-events-none absolute inset-0" aria-hidden />
+      <div className="kore-ambient pointer-events-none absolute inset-0" aria-hidden />
       <div className="glass glass-sheen relative z-10 flex max-w-md flex-col items-center rounded-3xl p-8 text-center">
         <span className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-kore-danger/40 bg-kore-danger/10">
           <AlertTriangle className="h-7 w-7 text-red-300" aria-hidden />

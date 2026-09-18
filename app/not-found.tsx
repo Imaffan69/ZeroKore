@@ -6,7 +6,7 @@ export const metadata = { title: "404 — ZeroKore" };
 export default function NotFound() {
   return (
     <main className="relative flex min-h-screen flex-col items-center justify-center bg-kore-bg px-4 text-kore-text">
-      <div className="kore-grid-bg pointer-events-none absolute inset-0" aria-hidden />
+      <div className="kore-ambient pointer-events-none absolute inset-0" aria-hidden />
       <div className="glass glass-sheen relative z-10 flex max-w-md flex-col items-center rounded-3xl p-8 text-center">
         <span className="glass-accent mb-4 flex h-14 w-14 items-center justify-center rounded-2xl">
           <Compass className="h-7 w-7 text-kore-accent" aria-hidden />

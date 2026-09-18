@@ -196,6 +196,14 @@ export async function runAgent(input: AgentRunInput): Promise<AgentRunResult> {
       break;
     }
 
+    // The assistant turn that requested these tools must be replayed with the
+    // matching ids before any tool result, or providers reject the turn (400).
+    messages.push({
+      role: "assistant",
+      content: turn.text || "",
+      toolCalls: turn.toolCalls,
+    });
+
     for (const call of turn.toolCalls) {
       events.push(event("tool_call", `[Tool Call] ${call.name}`));
       console.log(
@@ -223,10 +231,6 @@ export async function runAgent(input: AgentRunInput): Promise<AgentRunResult> {
         JSON.stringify({ event: "tool_completed", tool: call.name })
       );
 
-      messages.push({
-        role: "assistant",
-        content: turn.text || "",
-      });
       messages.push({
         role: "tool",
         content: execResult.ok

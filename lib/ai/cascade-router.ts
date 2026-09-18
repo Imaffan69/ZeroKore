@@ -14,6 +14,14 @@ export interface ChatMsg {
   content: string;
   toolCallId?: string;
   toolName?: string;
+  /**
+   * The tool calls this assistant turn asked for. Every provider requires a
+   * `tool` result message to be preceded by the assistant turn that requested
+   * it, carrying the matching ids — a `tool` message whose parent has no
+   * `tool_calls` (OpenAI shape) or `functionCall` part (Gemini shape) is
+   * rejected with a 400 and breaks the entire turn.
+   */
+  toolCalls?: UnifiedToolCall[];
 }
 
 export interface ToolSpec {
@@ -125,6 +133,34 @@ class FatalError extends Error {
   }
 }
 
+/**
+ * Extract the provider's own explanation from an error response so a failure
+ * can be shown and debugged instead of guessed at. Reads at most one body and
+ * never touches headers, keys or tokens.
+ */
+async function describeError(res: Response): Promise<string> {
+  try {
+    const text = (await res.text()).slice(0, 2000);
+    if (!text) return "";
+    try {
+      const parsed = JSON.parse(text);
+      const raw =
+        parsed?.error?.message ??
+        parsed?.message ??
+        parsed?.detail ??
+        parsed?.error;
+      if (typeof raw === "string" && raw.trim()) {
+        return `: ${raw.replace(/\s+/g, " ").trim().slice(0, 240)}`;
+      }
+    } catch {
+      return `: ${text.replace(/\s+/g, " ").trim().slice(0, 240)}`;
+    }
+  } catch {
+    // Body already consumed or unreadable — the status code still tells the story.
+  }
+  return "";
+}
+
 function toOpenAITools(tools: ToolSpec[] | undefined) {
   if (!tools || tools.length === 0) return undefined;
   return tools.map((t) => ({
@@ -138,16 +174,47 @@ function toOpenAITools(tools: ToolSpec[] | undefined) {
 }
 
 function toOpenAIMessages(messages: ChatMsg[]) {
-  return messages.map((m) => {
-    if (m.role === "tool") {
-      return {
-        role: "tool" as const,
-        content: m.content,
-        tool_call_id: m.toolCallId ?? "",
-      };
+  const out: Record<string, unknown>[] = [];
+  for (const m of messages) {
+    if (m.role === "system") {
+      out.push({ role: "system", content: m.content });
+      continue;
     }
-    return { role: m.role, content: m.content };
-  });
+    if (m.role === "tool") {
+      out.push({
+        role: "tool",
+        // A tool message must never be empty for OpenAI-compatible providers.
+        content: m.content || "(no output)",
+        tool_call_id: m.toolCallId ?? "",
+      });
+      continue;
+    }
+    if (m.role === "assistant") {
+      if (m.toolCalls && m.toolCalls.length > 0) {
+        // Echo the request back with its ids so the tool results are valid.
+        out.push({
+          role: "assistant",
+          content: m.content || null,
+          tool_calls: m.toolCalls.map((c) => ({
+            id: c.id,
+            type: "function",
+            function: {
+              name: c.name,
+              arguments: JSON.stringify(c.args ?? {}),
+            },
+          })),
+        });
+        continue;
+      }
+      // An assistant turn with no text and no tool calls carries no meaning and
+      // is rejected by some providers — drop it instead of sending "".
+      if (!m.content) continue;
+      out.push({ role: "assistant", content: m.content });
+      continue;
+    }
+    out.push({ role: "user", content: m.content });
+  }
+  return out;
 }
 
 async function callOpenAICompatible(
@@ -179,14 +246,20 @@ async function callOpenAICompatible(
     });
 
     if (res.status === 400) {
-      throw new FatalError(`Provider rejected the request (${res.status}).`);
+      // A 400 is provider-side validation (e.g. a tool turn it refused). Treat
+      // it as retryable so the cascade falls through to the next provider
+      // instead of failing the user's entire request.
+      throw new RetryableError(
+        `Provider rejected the request (400)${await describeError(res)}.`,
+        400
+      );
     }
     if (res.status === 429 || res.status >= 500) {
       throw new RetryableError(`Provider error (${res.status}).`, res.status);
     }
     if (res.status === 401 || res.status === 403 || res.status === 404) {
       throw new RetryableError(
-        `Provider unavailable (${res.status}).`,
+        `Provider rejected our credentials or model (${res.status})${await describeError(res)}.`,
         res.status
       );
     }
@@ -254,10 +327,21 @@ function toGeminiContents(messages: ChatMsg[]) {
       });
       continue;
     }
-    contents.push({
-      role: m.role === "assistant" ? "model" : "user",
-      parts: [{ text: m.content }],
-    });
+    if (m.role === "assistant") {
+      // Gemini expects the model turn to carry the functionCall parts that the
+      // following functionResponse answers. Empty text parts are invalid.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const parts: any[] = [];
+      if (m.content) parts.push({ text: m.content });
+      for (const c of m.toolCalls ?? []) {
+        parts.push({ functionCall: { name: c.name, args: c.args ?? {} } });
+      }
+      if (parts.length === 0) continue;
+      contents.push({ role: "model", parts });
+      continue;
+    }
+    if (!m.content) continue;
+    contents.push({ role: "user", parts: [{ text: m.content }] });
   }
   return { system: system.join("\n\n"), contents };
 }
@@ -300,7 +384,12 @@ async function callGemini(
     );
 
     if (res.status === 400) {
-      throw new FatalError(`Provider rejected the request (${res.status}).`);
+      // Retryable, not fatal: the cascade should try the next provider rather
+      // than aborting the user's request on one provider's validation error.
+      throw new RetryableError(
+        `Gemini rejected the request (400)${await describeError(res)}.`,
+        400
+      );
     }
     if (res.status === 429 || res.status >= 500) {
       throw new RetryableError(`Provider error (${res.status}).`, res.status);

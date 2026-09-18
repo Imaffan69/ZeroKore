@@ -11,14 +11,14 @@ const config: Config = {
     extend: {
       colors: {
         kore: {
-          bg: "#0a0a0a",
-          panel: "#141414",
-          panel2: "#0f0f0f",
+          bg: "#060607",
+          panel: "#1a1a1d",
+          panel2: "#111113",
           accent: "#ffffff",
           accentDim: "#d4d4d4",
-          text: "#e7e7e7",
-          muted: "#8f8f8f",
-          border: "#262626",
+          text: "#ededed",
+          muted: "#a8a8ad",
+          border: "#2e2e33",
           danger: "#ef4444",
           warn: "#f59e0b",
         },
