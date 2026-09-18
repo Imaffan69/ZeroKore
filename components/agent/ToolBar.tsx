@@ -1,5 +1,6 @@
 "use client";
 
+import { motion } from "framer-motion";
 import { useRef } from "react";
 import { Send, Square, Plus, Code2, Search, MessagesSquare } from "lucide-react";
 import type { AgentMode } from "@/types";
@@ -53,15 +54,23 @@ export default function ToolBar({
   return (
     <div className="glass-bar px-3 py-3 sm:px-4">
       {limitReached && (
-        <p role="alert" className="mb-2 rounded-md border border-kore-warn/40 bg-kore-warn/10 px-3 py-2 text-xs text-amber-200">
+        <motion.p
+          role="alert"
+          className="mb-2 rounded-md border border-kore-warn/40 bg-kore-warn/10 px-3 py-2 text-xs text-amber-200"
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.25 }}
+        >
           Daily AI request limit reached (15/15). Resets tomorrow — your
           conversation and typed input are preserved.
-        </p>
+        </motion.p>
       )}
       <div className="mb-2 flex items-center gap-1.5" role="group" aria-label="Agent mode">
         {MODES.map((m) => (
-          <button
+          <motion.button
             key={m.id}
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.95 }}
             onClick={() => onModeChange(m.id)}
             aria-pressed={mode === m.id}
             className={cn(
@@ -73,7 +82,7 @@ export default function ToolBar({
           >
             <m.icon className="h-3.5 w-3.5" aria-hidden />
             {m.label}
-          </button>
+          </motion.button>
         ))}
       </div>
       <div className="flex items-end gap-2">
@@ -97,16 +106,20 @@ export default function ToolBar({
           className="glass-subtle max-h-40 min-h-[44px] flex-1 resize-none rounded-2xl px-4 py-2.5 text-sm text-kore-text placeholder:text-kore-muted/60 focus:border-kore-accent disabled:opacity-60"
         />
         {loading ? (
-          <button
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.97 }}
             onClick={onStop}
             className="glass-interactive flex h-11 shrink-0 items-center gap-1.5 rounded-full border border-kore-danger/50 bg-kore-danger/10 px-4 text-sm font-semibold text-red-300 transition hover:bg-kore-danger/20"
             aria-label="Stop generation"
           >
             <Square className="h-4 w-4 fill-current" aria-hidden />
             <span className="hidden sm:inline">Stop</span>
-          </button>
+          </motion.button>
         ) : (
-          <button
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.97 }}
             onClick={onSend}
             disabled={!value.trim() || limitReached}
             className="glass-interactive flex h-11 shrink-0 items-center gap-1.5 rounded-full bg-kore-accent px-4 text-sm font-semibold text-black shadow-glow transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
@@ -114,16 +127,18 @@ export default function ToolBar({
           >
             <Send className="h-4 w-4" aria-hidden />
             <span className="hidden sm:inline">Send</span>
-          </button>
+          </motion.button>
         )}
-        <button
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
           onClick={onNew}
           className="glass glass-interactive flex h-11 shrink-0 items-center rounded-full px-3 text-kore-muted hover:text-white"
           aria-label="New task"
           title="New task"
         >
           <Plus className="h-4 w-4" aria-hidden />
-        </button>
+        </motion.button>
       </div>
     </div>
   );

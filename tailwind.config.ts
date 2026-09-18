@@ -34,6 +34,10 @@ const config: Config = {
       },
       backdropBlur: {
         xs: "2px",
+        sm: "6px",
+      },
+      transitionTimingFunction: {
+        spring: "cubic-bezier(0.32, 0.72, 0, 1)",
       },
     },
   },

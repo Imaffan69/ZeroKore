@@ -1,6 +1,4 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
-import { redirect } from "next/navigation";
 import {
   Terminal,
   Code2,
@@ -48,19 +46,7 @@ const FEATURES = [
 
 const PROVIDERS = ["GROQ", "DEEPSEEK", "SAMBANOVA", "GEMINI"];
 
-export default async function LandingPage() {
-  let authed = false;
-  try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    authed = !!user;
-  } catch {
-    authed = false;
-  }
-  if (authed) redirect("/dashboard");
-
+export default function LandingPage() {
   return (
     <main className="relative min-h-screen overflow-hidden bg-kore-bg text-kore-text">
       {/* Animated backdrop */}
@@ -164,7 +150,7 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      {/* Security */}
+      {/* Security + footer */}
       <section className="relative z-10 mx-auto max-w-6xl px-4 pb-20 sm:px-6" aria-label="Security">
         <div className="glass-accent glass-sheen flex flex-col items-start gap-3 rounded-2xl p-5 sm:flex-row sm:items-center sm:p-6">
           <ShieldCheck className="h-8 w-8 shrink-0 text-kore-accent" aria-hidden />

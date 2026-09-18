@@ -1,5 +1,6 @@
 "use client";
 
+import { motion } from "framer-motion";
 import {
   Terminal,
   Plus,
@@ -76,43 +77,72 @@ export default function Sidebar(props: SidebarProps) {
   return (
     <>
       {/* Mobile scrim */}
-      <div
+      <motion.div
         className={cn(
           "fixed inset-0 z-30 bg-black/60 transition-opacity lg:hidden",
           open ? "opacity-100" : "pointer-events-none opacity-0"
         )}
         onClick={onClose}
         aria-hidden
+        initial={false}
+        animate={{ opacity: open ? 1 : 0 }}
+        transition={{ duration: 0.2 }}
       />
-      <aside
+      <motion.aside
         className={cn(
           "fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-white/10 bg-kore-bg/85 backdrop-blur-2xl transition-transform duration-200 lg:static lg:z-auto lg:translate-x-0",
           open ? "translate-x-0" : "-translate-x-full"
         )}
         aria-label="ZeroKore sidebar"
+        initial={false}
+        animate={{ x: open ? 0 : -320 }}
+        transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
       >
         {/* Brand */}
-        <div className="flex items-center justify-between border-b border-kore-border px-4 py-3.5">
+        <motion.div
+          className="flex items-center justify-between border-b border-kore-border px-4 py-3.5"
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+        >
           <div className="flex items-center gap-2.5">
             <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-kore-accent/40 bg-kore-bg">
-              <Terminal className="h-4 w-4 text-kore-accent" aria-hidden />
+              <motion.span
+                initial={{ opacity: 0, scale: 0.85 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+              >
+                <Terminal className="h-4 w-4 text-kore-accent" aria-hidden />
+              </motion.span>
             </span>
-            <span className="font-mono text-sm font-bold tracking-widest">
+            <motion.span
+              className="font-mono text-sm font-bold tracking-widest"
+              initial={{ opacity: 0, x: -6 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1], delay: 0.03 }}
+            >
               ZERO<span className="text-kore-accent">KORE</span>
-            </span>
+            </motion.span>
           </div>
-          <button
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
             onClick={onClose}
-            className="rounded p-1.5 text-kore-muted hover:bg-kore-bg hover:text-white lg:hidden"
+            className="rounded p-1.5 text-kore-muted transition hover:bg-kore-bg hover:text-white lg:hidden"
             aria-label="Close sidebar"
           >
             <X className="h-5 w-5" aria-hidden />
-          </button>
-        </div>
+          </motion.button>
+        </motion.div>
 
         <div className="flex-1 overflow-y-auto px-3 py-3">
           {/* Status */}
-          <div className="glass-subtle mb-3 rounded-xl p-3 font-mono text-xs">
+          <motion.div
+            className="glass-subtle mb-3 rounded-xl p-3 font-mono text-xs"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1], delay: 0.05 }}
+          >
             <div className="mb-2 flex items-center justify-between">
               <span className="text-kore-muted">PROVIDER</span>
               <span className="text-kore-accent">
@@ -147,10 +177,15 @@ export default function Sidebar(props: SidebarProps) {
                 ● {email || "—"}
               </span>
             </div>
-          </div>
+          </motion.div>
 
           {/* Usage */}
-          <div className="glass-subtle mb-3 rounded-xl p-3">
+          <motion.div
+            className="glass-subtle mb-3 rounded-xl p-3"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1], delay: 0.08 }}
+          >
             <div className="mb-1.5 flex items-center justify-between font-mono text-xs">
               <span className="text-kore-muted">USAGE</span>
               <span className="text-kore-text">
@@ -169,26 +204,41 @@ export default function Sidebar(props: SidebarProps) {
               aria-valuemax={100}
               aria-label="Daily AI usage"
             >
-              <div
+              <motion.div
                 className={cn(
-                  "h-full rounded-full transition-all",
+                  "h-full rounded-full transition-colors",
                   usagePct >= 100 ? "bg-kore-danger" : "bg-kore-accent"
                 )}
-                style={{ width: `${usage ? usagePct : 0}%` }}
+                initial={{ scaleX: 0 }}
+                animate={{ scaleX: usage ? usagePct / 100 : 0 }}
+                transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+                style={{ transformOrigin: "left" }}
               />
             </div>
-          </div>
+          </motion.div>
 
           {/* Modes */}
           <p className="mb-1.5 px-1 font-mono text-[11px] tracking-wider text-kore-muted">
             AGENT MODE
           </p>
-          <div className="mb-3 grid grid-cols-3 gap-1.5" role="group" aria-label="Agent mode">
+          <motion.div
+            className="mb-3 grid grid-cols-3 gap-1.5"
+            role="group"
+            aria-label="Agent mode"
+            initial="hidden"
+            animate="visible"
+            variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.05 } } }}
+          >
             {MODES.map((m) => (
-              <button
+              <motion.button
                 key={m.id}
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.95 }}
                 onClick={() => onModeChange(m.id)}
                 aria-pressed={mode === m.id}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
                 className={cn(
                   "flex flex-col items-center gap-1 rounded-lg border px-2 py-2 text-xs transition",
                   mode === m.id
@@ -198,117 +248,136 @@ export default function Sidebar(props: SidebarProps) {
               >
                 <m.icon className="h-4 w-4" aria-hidden />
                 {m.label}
-              </button>
+              </motion.button>
             ))}
-          </div>
+          </motion.div>
 
           {/* Actions */}
-          <button
+          <motion.button
+            whileHover={{ translateY: -1 }}
+            whileTap={{ scale: 0.97 }}
             onClick={() => {
               onNew();
               onClose();
             }}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1], delay: 0.1 }}
             className="glass-interactive mb-3 flex w-full items-center justify-center gap-2 rounded-full bg-kore-accent px-3 py-2.5 text-sm font-semibold text-black shadow-glow transition hover:bg-emerald-400"
           >
             <Plus className="h-4 w-4" aria-hidden />
             New Task
-          </button>
+          </motion.button>
 
           {/* Conversations */}
           <p className="mb-1.5 px-1 font-mono text-[11px] tracking-wider text-kore-muted">
             CONVERSATIONS
           </p>
           <div className="mb-3 space-y-1">
-            {conversations.length === 0 && (
-              <p className="px-1 py-2 text-xs text-kore-muted">
-                No conversations yet.
-              </p>
-            )}
-            {conversations.map((c) => (
-              <div
-                key={c.id}
-                className={cn(
-                  "group flex items-center gap-1 rounded-lg border transition",
-                  activeId === c.id
-                    ? "border-kore-accent/50 bg-kore-accent/10"
-                    : "border-transparent hover:border-kore-border hover:bg-kore-bg"
-                )}
+            {conversations.length === 0 ? (
+              <motion.p
+                className="px-1 py-2 text-xs text-kore-muted"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.4, delay: 0.12 }}
               >
-                <button
-                  onClick={() => {
-                    onSelect(c.id);
-                    onClose();
-                  }}
-                  className="flex min-w-0 flex-1 items-center gap-2 px-2.5 py-2 text-left text-sm"
-                  title={c.title}
+                No conversations yet.
+              </motion.p>
+            ) : (
+              conversations.map((c, i) => (
+                <motion.div
+                  key={c.id}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1], delay: 0.05 + i * 0.04 }}
+                  className={cn(
+                    "group flex items-center gap-1 rounded-lg border transition",
+                    activeId === c.id
+                      ? "border-kore-accent/50 bg-kore-accent/10"
+                      : "border-transparent hover:border-kore-border hover:bg-kore-bg"
+                  )}
                 >
-                  <MessageSquare
-                    className={cn(
-                      "h-3.5 w-3.5 shrink-0",
-                      activeId === c.id ? "text-kore-accent" : "text-kore-muted"
-                    )}
-                    aria-hidden
-                  />
-                  <span className="truncate text-kore-text">{c.title}</span>
-                </button>
-                <button
-                  onClick={() => onDelete(c.id)}
-                  className="mr-1 rounded p-1.5 text-kore-muted opacity-0 transition hover:bg-kore-danger/20 hover:text-red-300 focus:opacity-100 group-hover:opacity-100"
-                  aria-label={`Delete conversation ${c.title}`}
-                  title="Delete (asks for confirmation)"
-                >
-                  <Trash2 className="h-3.5 w-3.5" aria-hidden />
-                </button>
-              </div>
-            ))}
+                  <button
+                    onClick={() => {
+                      onSelect(c.id);
+                      onClose();
+                    }}
+                    className="flex min-w-0 flex-1 items-center gap-2 px-2.5 py-2 text-left text-sm"
+                    title={c.title}
+                  >
+                    <MessageSquare
+                      className={cn(
+                        "h-3.5 w-3.5 shrink-0",
+                        activeId === c.id ? "text-kore-accent" : "text-kore-muted"
+                      )}
+                      aria-hidden
+                    />
+                    <span className="truncate text-kore-text">{c.title}</span>
+                  </button>
+                  <motion.button
+                    whileHover={{ scale: 1.08 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => onDelete(c.id)}
+                    className="mr-1 rounded p-1.5 text-kore-muted opacity-0 transition hover:bg-kore-danger/20 hover:text-red-300 focus:opacity-100 group-hover:opacity-100"
+                    aria-label={`Delete conversation ${c.title}`}
+                    title="Delete (asks for confirmation)"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" aria-hidden />
+                  </motion.button>
+                </motion.div>
+              ))
+            )}
           </div>
 
           {/* Views */}
           <div className="space-y-1">
-            <button
-              onClick={() => {
-                onViewChange("memory");
-                onClose();
-              }}
-              className={cn(
-                "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition",
-                view === "memory"
-                  ? "bg-kore-accent/10 text-kore-accent"
-                  : "text-kore-muted hover:bg-kore-bg hover:text-white"
-              )}
-            >
-              <BrainCircuit className="h-4 w-4" aria-hidden />
-              Memory
-            </button>
-            <button
-              onClick={() => {
-                onViewChange("settings");
-                onClose();
-              }}
-              className={cn(
-                "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition",
-                view === "settings"
-                  ? "bg-kore-accent/10 text-kore-accent"
-                  : "text-kore-muted hover:bg-kore-bg hover:text-white"
-              )}
-            >
-              <Settings className="h-4 w-4" aria-hidden />
-              Settings
-            </button>
+            {[
+              { id: "memory" as const, label: "Memory", icon: BrainCircuit },
+              { id: "settings" as const, label: "Settings", icon: Settings },
+            ].map((v, i) => (
+              <motion.button
+                key={v.id}
+                whileHover={{ translateY: -1 }}
+                whileTap={{ scale: 0.98 }}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1], delay: 0.12 + i * 0.05 }}
+                onClick={() => {
+                  onViewChange(v.id);
+                  onClose();
+                }}
+                className={cn(
+                  "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition",
+                  view === v.id
+                    ? "bg-kore-accent/10 text-kore-accent"
+                    : "text-kore-muted hover:bg-kore-bg hover:text-white"
+                )}
+              >
+                <v.icon className="h-4 w-4" aria-hidden />
+                {v.label}
+              </motion.button>
+            ))}
           </div>
         </div>
 
         {/* Logout */}
-        <div className="border-t border-kore-border p-3">
-          <button
+        <motion.div
+          className="border-t border-kore-border p-3"
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1], delay: 0.15 }}
+        >
+          <motion.button
+            whileHover={{ translateY: -1 }}
+            whileTap={{ scale: 0.98 }}
             onClick={onLogout}
             className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-kore-muted transition hover:bg-kore-danger/10 hover:text-red-300"
           >
             <LogOut className="h-4 w-4" aria-hidden />
             Logout
-          </button>
-        </div>
-      </aside>
+          </motion.button>
+        </motion.div>
+      </motion.aside>
     </>
   );
 }

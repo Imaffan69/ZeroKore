@@ -1,8 +1,9 @@
 "use client";
 
+import { motion } from "framer-motion";
 import { Menu, Circle } from "lucide-react";
 import type { AgentMode } from "@/types";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils"
 
 interface HeaderProps {
   onMenu: () => void;
@@ -20,14 +21,15 @@ const MODE_LABEL: Record<AgentMode, string> = {
 
 export default function Header({ onMenu, title, mode, status, provider }: HeaderProps) {
   return (
-    <header className="glass-bar glass-sheen sticky top-0 z-20 flex items-center gap-3 px-3 py-2.5 sm:px-4">
-      <button
+    <header className="glass-bar glass-sheen sticky top-0 z-20 flex items-center gap-3 px-3 py-2.5 sm:px-4">        <motion.button
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
         onClick={onMenu}
         className="rounded-md p-2 text-kore-muted transition hover:bg-kore-bg hover:text-white lg:hidden"
         aria-label="Open sidebar"
       >
         <Menu className="h-5 w-5" aria-hidden />
-      </button>
+      </motion.button>
 
       <div className="min-w-0 flex-1">
         <h1 className="truncate text-sm font-semibold text-white sm:text-base" title={title}>

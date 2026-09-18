@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { motion } from "framer-motion";
 import { Terminal, Loader2, AlertCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -95,11 +96,21 @@ export default function AuthForm({ mode }: { mode: Mode }) {
   }
 
   return (
-    <div className="glass glass-sheen w-full max-w-md rounded-3xl p-6 sm:p-8">
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+      className="glass glass-sheen w-full max-w-md rounded-3xl p-6 sm:p-8"
+    >
       <div className="mb-6 flex items-center gap-2.5">
-        <span className="glass-accent flex h-9 w-9 items-center justify-center rounded-2xl">
+        <motion.span
+          className="glass-accent flex h-9 w-9 items-center justify-center rounded-2xl"
+          initial={{ opacity: 0, scale: 0.85 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1], delay: 0.05 }}
+        >
           <Terminal className="h-5 w-5 text-kore-accent" aria-hidden />
-        </span>
+        </motion.span>
         <span className="font-mono text-lg font-bold tracking-widest">
           ZERO<span className="text-kore-accent">KORE</span>
         </span>
@@ -216,6 +227,6 @@ export default function AuthForm({ mode }: { mode: Mode }) {
           </>
         )}
       </p>
-    </div>
+    </motion.div>
   );
 }
