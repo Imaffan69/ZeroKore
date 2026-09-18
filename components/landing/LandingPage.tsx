@@ -127,11 +127,11 @@ const HERO_EVENTS = [
 ] as const;
 
 const EVENT_COLOR: Record<(typeof HERO_EVENTS)[number]["kind"], string> = {
-  start: "text-emerald-300",
+  start: "text-white",
   mem: "text-sky-300",
   tool: "text-amber-200",
   run: "text-violet-200",
-  done: "text-emerald-300",
+  done: "text-white",
 };
 
 /* ------------------------------------------------------------------ */
@@ -152,7 +152,7 @@ function WorkspaceMock() {
           zerokore / dashboard
         </p>
         <span className="glass-subtle ml-auto hidden items-center gap-1.5 rounded-full px-2 py-0.5 font-mono text-[10px] text-kore-muted sm:flex">
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" aria-hidden />
+          <span className="h-1.5 w-1.5 rounded-full bg-white" aria-hidden />
           READY
         </span>
       </div>
@@ -181,7 +181,7 @@ function WorkspaceMock() {
               transition={{ duration: 0.4, delay: 1.15 }}
               className="flex items-center gap-2 pt-1.5 text-kore-muted"
             >
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" aria-hidden />
+              <span className="h-1.5 w-1.5 rounded-full bg-white" aria-hidden />
               awaiting your instruction
               <span className="kore-caret">▊</span>
             </motion.div>
@@ -221,8 +221,8 @@ function WorkspaceMock() {
               ))}
             </div>
             <div className="space-y-1 p-2 font-mono text-[10px] leading-relaxed">
-              <p className="text-emerald-300">+ add sandboxed preview frame</p>
-              <p className="text-emerald-300">+ cap tool loop at 8 iterations</p>
+              <p className="text-white">+ add sandboxed preview frame</p>
+              <p className="text-white">+ cap tool loop at 8 iterations</p>
               <p className="text-red-300/80">- render generated HTML inline</p>
               <p className="text-kore-muted">  (unsafe — removed)</p>
             </div>

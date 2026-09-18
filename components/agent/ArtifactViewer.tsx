@@ -175,13 +175,13 @@ export default function ArtifactViewer({
           />
         ) : null}
         {activeTab === "code" ? (
-          <pre className="max-w-full overflow-x-auto p-3 font-mono text-xs leading-relaxed text-emerald-100">
+          <pre className="max-w-full overflow-x-auto p-3 font-mono text-xs leading-relaxed text-white/85">
             <code>{artifact.content}</code>
           </pre>
         ) : null}
         {activeTab === "markdown" && showMarkdownTab ? (
           <div
-            className="kore-prose max-w-full p-4 text-sm leading-relaxed [&_a]:text-kore-accent [&_a]:underline [&_code]:rounded [&_code]:bg-kore-panel [&_code]:px-1 [&_code]:text-[0.85em] [&_code]:text-emerald-200 [&_h2]:text-lg [&_h2]:font-bold [&_h2]:text-white [&_h3]:text-base [&_h3]:font-bold [&_h3]:text-white [&_h4]:font-bold [&_h4]:text-white [&_li]:ml-4 [&_li]:list-disc [&_strong]:text-white"
+            className="kore-prose max-w-full p-4 text-sm leading-relaxed [&_a]:text-kore-accent [&_a]:underline [&_code]:rounded [&_code]:bg-kore-panel [&_code]:px-1 [&_code]:text-[0.85em] [&_code]:text-white/90 [&_h2]:text-lg [&_h2]:font-bold [&_h2]:text-white [&_h3]:text-base [&_h3]:font-bold [&_h3]:text-white [&_h4]:font-bold [&_h4]:text-white [&_li]:ml-4 [&_li]:list-disc [&_strong]:text-white"
             dangerouslySetInnerHTML={{
               __html: renderSafeMarkdown(artifact.content),
             }}

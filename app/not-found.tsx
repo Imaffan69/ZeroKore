@@ -20,7 +20,7 @@ export default function NotFound() {
         <div className="mt-6 flex gap-3">
           <Link
             href="/"
-            className="glass-interactive rounded-full bg-kore-accent px-5 py-2.5 text-sm font-semibold text-black shadow-glow transition hover:bg-emerald-400"
+            className="glass-interactive rounded-full bg-kore-accent px-5 py-2.5 text-sm font-semibold text-black shadow-glow transition hover:bg-white/85"
           >
             Go home
           </Link>

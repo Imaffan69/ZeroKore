@@ -37,7 +37,7 @@ export default function GlobalError({
         </p>
         <button
           onClick={reset}
-          className="glass-interactive mt-6 flex items-center gap-2 rounded-full bg-kore-accent px-5 py-2.5 text-sm font-semibold text-black shadow-glow transition hover:bg-emerald-400"
+          className="glass-interactive mt-6 flex items-center gap-2 rounded-full bg-kore-accent px-5 py-2.5 text-sm font-semibold text-black shadow-glow transition hover:bg-white/85"
         >
           <RotateCcw className="h-4 w-4" aria-hidden />
           Try again

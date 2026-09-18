@@ -264,7 +264,7 @@ export default function Sidebar(props: SidebarProps) {
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1], delay: 0.1 }}
-            className="glass-interactive mb-3 flex w-full items-center justify-center gap-2 rounded-full bg-kore-accent px-3 py-2.5 text-sm font-semibold text-black shadow-glow transition hover:bg-emerald-400"
+            className="glass-interactive mb-3 flex w-full items-center justify-center gap-2 rounded-full bg-kore-accent px-3 py-2.5 text-sm font-semibold text-black shadow-glow transition hover:bg-white/85"
           >
             <Plus className="h-4 w-4" aria-hidden />
             New Task

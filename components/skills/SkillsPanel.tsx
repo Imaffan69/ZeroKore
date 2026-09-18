@@ -25,7 +25,7 @@ const PROSE = cn(
   "kore-prose text-sm leading-relaxed text-kore-text",
   "[&_a]:text-kore-accent [&_a]:underline [&_a]:underline-offset-2",
   "[&_blockquote]:my-3 [&_blockquote]:border-l-2 [&_blockquote]:border-kore-border [&_blockquote]:pl-3 [&_blockquote]:text-kore-muted",
-  "[&_code]:rounded [&_code]:bg-white/[0.06] [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[0.85em] [&_code]:text-emerald-200",
+  "[&_code]:rounded [&_code]:bg-white/[0.06] [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[0.85em] [&_code]:text-white/90",
   "[&_em]:text-kore-text",
   "[&_h2]:mb-2 [&_h2]:mt-6 [&_h2]:text-lg [&_h2]:font-semibold [&_h2]:tracking-tight [&_h2]:text-white",
   "[&_h3]:mb-2 [&_h3]:mt-6 [&_h3]:text-base [&_h3]:font-semibold [&_h3]:text-white",
@@ -282,7 +282,7 @@ export default function SkillsPanel({ onUseSkill }: SkillsPanelProps) {
               </p>
               <p className="mx-auto mt-1.5 max-w-sm text-xs leading-relaxed text-kore-muted">
                 Add a folder at{" "}
-                <code className="rounded bg-white/[0.06] px-1 py-0.5 font-mono text-[11px] text-emerald-200">
+                <code className="rounded bg-white/[0.06] px-1 py-0.5 font-mono text-[11px] text-white/90">
                   .claude/skills/&lt;name&gt;/SKILL.md
                 </code>{" "}
                 and commit it — it will appear here for everyone on the project.
