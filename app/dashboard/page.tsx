@@ -2,14 +2,33 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Terminal, Trash2, CheckCircle2 } from "lucide-react";
+import { motion } from "framer-motion";
+import {
+  Terminal,
+  Trash2,
+  CheckCircle2,
+  Code2,
+  Search,
+  BookOpen,
+  PenTool,
+  ArrowRight,
+  BrainCircuit,
+} from "lucide-react";
 import Sidebar, { type SidebarView } from "@/components/layout/Sidebar";
 import Header from "@/components/layout/Header";
+import SkillsPanel from "@/components/skills/SkillsPanel";
+import SettingsPanel from "@/components/settings/SettingsPanel";
 import ExecutionTerminal from "@/components/agent/ExecutionTerminal";
 import ArtifactViewer from "@/components/agent/ArtifactViewer";
 import DualPanelCanvas from "@/components/agent/DualPanelCanvas";
 import ToolBar from "@/components/agent/ToolBar";
 import { createClient } from "@/lib/supabase/client";
+import {
+  loadPreferences,
+  savePreferences,
+  DEFAULT_PREFERENCES,
+} from "@/lib/preferences";
+import { EASE, fadeUp, staggerGroup, hoverLift, press } from "@/lib/motion";
 import type {
   AgentEvent,
   AgentMode,
@@ -18,14 +37,37 @@ import type {
   ChatMessage,
   Conversation,
   MemoryRecord,
+  ProviderPreference,
   UsageState,
 } from "@/types";
 
+const VIEW_TITLE: Record<Exclude<SidebarView, "workspace">, string> = {
+  skills: "Skills",
+  memory: "Memory",
+  settings: "Settings",
+};
+
 const SUGGESTIONS = [
-  "Build a landing page",
-  "Research vector databases",
-  "Explain async/await",
-  "Generate a logo SVG",
+  {
+    icon: Code2,
+    label: "Build a landing page",
+    prompt: "Build a responsive landing page for a developer tool",
+  },
+  {
+    icon: Search,
+    label: "Research a topic",
+    prompt: "Research vector databases and compare the top options",
+  },
+  {
+    icon: BookOpen,
+    label: "Explain some code",
+    prompt: "Explain how async/await works with a small example",
+  },
+  {
+    icon: PenTool,
+    label: "Generate a graphic",
+    prompt: "Generate a minimal SVG logo for a terminal app",
+  },
 ];
 
 function uid(): string {
@@ -54,6 +96,7 @@ export default function DashboardPage() {
   const [dbOk, setDbOk] = useState(false);
   const [memories, setMemories] = useState<MemoryRecord[]>([]);
   const [toast, setToast] = useState<string | null>(null);
+  const [preferences, setPreferences] = useState(DEFAULT_PREFERENCES);
 
   const abortRef = useRef<AbortController | null>(null);
   const inputRef = useRef<string>("");
@@ -123,6 +166,22 @@ export default function DashboardPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // --- Load persisted preferences (project name, pinned model, motion) ---
+  useEffect(() => {
+    setPreferences(loadPreferences());
+  }, []);
+
+  const updatePreferences = useCallback(
+    (patch: Partial<typeof DEFAULT_PREFERENCES>) => {
+      setPreferences((prev) => {
+        const nextPrefs = { ...prev, ...patch };
+        savePreferences(nextPrefs);
+        return nextPrefs;
+      });
+    },
+    []
+  );
+
   const refreshUsage = useCallback(async () => {
     try {
       const res = await fetch("/api/usage");
@@ -179,6 +238,7 @@ export default function DashboardPage() {
           message: text,
           conversationId: activeId,
           mode,
+          provider: preferences.preferredProvider,
         }),
         signal: controller.signal,
       });
@@ -355,32 +415,69 @@ export default function DashboardPage() {
 
   const emptyHint = (
     <div className="flex h-full flex-col items-center justify-center py-10 text-center">
-      <span className="glass glass-sheen mb-4 flex h-12 w-12 items-center justify-center rounded-2xl shadow-glow">
-        <Terminal className="h-6 w-6 text-kore-accent" aria-hidden />
-      </span>
-      <p className="font-mono text-sm tracking-widest text-white">
-        ZERO <span className="text-kore-accent">KORE</span>
-      </p>
-      <p className="mt-1 text-xs text-kore-muted">
-        Autonomous Intelligence Workspace
-      </p>
-      <p className="mb-5 mt-3 text-sm text-kore-text">
-        Ready when you are. Choose a mode and start a task.
-      </p>
-      <div className="grid w-full max-w-md grid-cols-1 gap-2 sm:grid-cols-2">
+      <motion.span
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.4, ease: EASE }}
+        className="glass glass-sheen mb-4 flex h-12 w-12 items-center justify-center rounded-2xl"
+      >
+        <Terminal className="h-5 w-5 text-kore-accent" aria-hidden />
+      </motion.span>
+
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.45, ease: EASE, delay: 0.06 }}
+      >
+        <p className="font-mono text-sm tracking-[0.18em] text-white">
+          ZERO<span className="text-kore-accent">KORE</span>
+        </p>
+        <p className="mt-1.5 text-xs text-kore-muted">
+          Autonomous intelligence workspace
+        </p>
+        <p className="mx-auto mt-4 max-w-sm text-sm leading-relaxed text-kore-text">
+          Nothing running yet. Pick a mode above, then describe what you want
+          built, fixed, or researched.
+        </p>
+      </motion.div>
+
+      <motion.div
+        initial="hidden"
+        animate="visible"
+        variants={staggerGroup(0.06, 0.18)}
+        className="mt-6 grid w-full max-w-lg grid-cols-1 gap-2 sm:grid-cols-2"
+      >
         {SUGGESTIONS.map((s) => (
-          <button
-            key={s}
+          <motion.button
+            key={s.label}
+            variants={fadeUp}
+            whileHover={hoverLift}
+            whileTap={press}
+            transition={{ duration: 0.18, ease: EASE }}
             onClick={() => {
-              setInput(s);
+              setInput(s.prompt);
               document.getElementById("kore-input")?.focus();
             }}
-            className="glass glass-interactive rounded-full px-3 py-2.5 text-left text-sm text-kore-muted hover:text-white"
+            className="glass glass-sheen group flex items-start gap-3 rounded-xl px-3.5 py-3 text-left"
           >
-            {s}
-          </button>
+            <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-kore-border bg-white/[0.03]">
+              <s.icon className="h-3.5 w-3.5 text-kore-muted" aria-hidden />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-medium text-kore-text">
+                {s.label}
+              </span>
+              <span className="mt-0.5 block truncate text-xs text-kore-muted">
+                {s.prompt}
+              </span>
+            </span>
+            <ArrowRight
+              className="mt-1 h-3.5 w-3.5 shrink-0 text-kore-muted opacity-0 transition-opacity duration-150 group-hover:opacity-100"
+              aria-hidden
+            />
+          </motion.button>
         ))}
-      </div>
+      </motion.div>
     </div>
   );
 
@@ -409,7 +506,7 @@ export default function DashboardPage() {
       <div className="flex min-w-0 flex-1 flex-col">
         <Header
           onMenu={() => setSidebarOpen(true)}
-          title={view === "workspace" ? activeTitle : view === "memory" ? "Memory" : "Settings"}
+          title={view === "workspace" ? activeTitle : VIEW_TITLE[view]}
           mode={mode}
           status={loading ? "loading" : error ? "error" : "idle"}
           provider={providerFallback ? `${providerFallback} → ${provider}` : provider}
@@ -444,18 +541,40 @@ export default function DashboardPage() {
           </>
         )}
 
+        {view === "skills" && (
+          <SkillsPanel
+            onUseSkill={(name) => {
+              setInput(`/${name} `);
+              setView("workspace");
+              setTimeout(() => {
+                document.getElementById("kore-input")?.focus();
+              }, 50);
+            }}
+          />
+        )}
+
         {view === "memory" && (
           <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">
             <div className="mx-auto max-w-2xl">
-              <h2 className="mb-1 text-lg font-bold text-white">Long-term memory</h2>
-              <p className="mb-4 text-sm text-kore-muted">
-                Durable facts ZeroKore recalls across conversations. Scoped to
-                your account only.
+              <h2 className="mb-1.5 text-lg font-semibold tracking-tight text-white">
+                Long-term memory
+              </h2>
+              <p className="mb-5 text-sm leading-relaxed text-kore-muted">
+                Facts ZeroKore recalls across conversations, scoped to your
+                account. Delete anything you don&apos;t want kept.
               </p>
               {memories.length === 0 ? (
-                <p className="glass-subtle rounded-xl p-6 text-center text-sm text-kore-muted">
-                  No saved memory yet.
-                </p>
+                <div className="glass-subtle rounded-xl px-6 py-8 text-center">
+                  <BrainCircuit
+                    className="mx-auto mb-3 h-5 w-5 text-kore-muted"
+                    aria-hidden
+                  />
+                  <p className="text-sm text-kore-text">No memories yet</p>
+                  <p className="mx-auto mt-1.5 max-w-xs text-xs leading-relaxed text-kore-muted">
+                    As you work, ZeroKore will save durable preferences and
+                    project context here. It stays private to your account.
+                  </p>
+                </div>
               ) : (
                 <ul className="space-y-2">
                   {memories.map((m) => (
@@ -482,48 +601,23 @@ export default function DashboardPage() {
         )}
 
         {view === "settings" && (
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">
-            <div className="mx-auto max-w-2xl space-y-4">
-              <div>
-                <h2 className="mb-1 text-lg font-bold text-white">Settings</h2>
-                <p className="text-sm text-kore-muted">
-                  Safe preferences only. API secrets are never exposed here.
-                </p>
-              </div>
-              <div className="glass glass-sheen rounded-2xl p-4 text-sm">
-                <p className="mb-1 font-mono text-xs text-kore-muted">ACCOUNT</p>
-                <p className="break-words text-kore-text">{email || "—"}</p>
-              </div>
-              <div className="glass glass-sheen rounded-2xl p-4 text-sm">
-                <p className="mb-1 font-mono text-xs text-kore-muted">USAGE</p>
-                <p className="text-kore-text">
-                  {usage
-                    ? usage.unlimited
-                      ? "Unlimited (admin)"
-                      : `${usage.used} / ${usage.limit} requests today`
-                    : "Loading…"}
-                </p>
-              </div>
-              <div className="glass glass-sheen rounded-2xl p-4 text-sm">
-                <p className="mb-1 font-mono text-xs text-kore-muted">STATUS</p>
-                <p className="text-kore-text">
-                  Provider: {providerFallback ? `${providerFallback} → ` : ""}{provider}
-                </p>
-                <p className="text-kore-text">
-                  Database: {dbOk ? "Connected" : "Unknown"}
-                </p>
-              </div>
-              <div className="glass-accent glass-sheen rounded-2xl p-4 text-sm text-kore-muted">
-                <p className="mb-1 font-mono text-xs text-kore-accent">SETUP NOTE</p>
-                <p>
-                  AI providers and web search are configured server-side via
-                  environment variables (see .env.example). Missing optional
-                  keys degrade gracefully — the agent tells you instead of
-                  faking results.
-                </p>
-              </div>
-            </div>
-          </div>
+          <SettingsPanel
+            email={email}
+            usage={usage}
+            provider={providerFallback ? `${providerFallback} → ${provider}` : provider}
+            providerFallback={providerFallback}
+            dbOk={dbOk}
+            preferredProvider={preferences.preferredProvider}
+            onProviderChange={(p: ProviderPreference) => {
+              updatePreferences({ preferredProvider: p });
+              showToast(
+                p === "auto"
+                  ? "Model set to Auto (fastest available)."
+                  : `Default model set to ${p}.`
+              );
+            }}
+            onToast={showToast}
+          />
         )}
       </div>
 

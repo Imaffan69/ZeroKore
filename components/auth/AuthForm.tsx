@@ -1,11 +1,37 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Terminal, Loader2, AlertCircle } from "lucide-react";
+import { Terminal, Loader2, AlertCircle, ShieldCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SUPABASE_ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+/** True when the Supabase client can be constructed at all. */
+function isConfigured(): boolean {
+  return !!(SUPABASE_URL && SUPABASE_ANON);
+}
+
+/** Translate raw auth failures into concise, actionable copy. */
+function humanizeAuthError(message: string): string {
+  const m = message.toLowerCase();
+  if (m.includes("failed to fetch") || m.includes("networkerror") || m.includes("load failed")) {
+    return "Could not reach the authentication service. If this is a fresh deploy, verify the Supabase project is active and the URL/key env vars are set.";
+  }
+  if (m.includes("email not confirmed")) {
+    return "Please verify your email before logging in. Check your inbox for the confirmation link.";
+  }
+  if (m.includes("invalid login")) {
+    return "Incorrect email or password.";
+  }
+  if (m.includes("rate limit")) {
+    return "Too many attempts. Wait a minute and try again.";
+  }
+  return message;
+}
 
 type Mode = "login" | "signup";
 
@@ -24,8 +50,15 @@ export default function AuthForm({ mode }: { mode: Mode }) {
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [configured, setConfigured] = useState(true);
 
   const isSignup = mode === "signup";
+
+  // Detect server auth configuration on mount so the form can explain
+  // itself instead of failing with a raw fetch error on submit.
+  useEffect(() => {
+    setConfigured(isConfigured());
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -46,6 +79,14 @@ export default function AuthForm({ mode }: { mode: Mode }) {
       return;
     }
 
+    // Blocked up-front when the deployment lacks auth configuration.
+    if (!configured) {
+      setError(
+        "Authentication is not configured on this deployment yet. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to the server environment, then reload."
+      );
+      return;
+    }
+
     setLoading(true);
     try {
       const supabase = createClient();
@@ -58,13 +99,19 @@ export default function AuthForm({ mode }: { mode: Mode }) {
           if (/already|exists|duplicate/i.test(signUpError.message)) {
             setError("An account with this email already exists. Try logging in.");
           } else {
-            setError(signUpError.message);
+            setError(humanizeAuthError(signUpError.message));
           }
           return;
         }
         setInfo(
           "Account created. If email confirmation is enabled, check your inbox — otherwise you can log in now."
         );
+        // Auto-continue when email confirmation is disabled.
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (sessionData?.session) {
+          router.push(next);
+          router.refresh();
+        }
       } else {
         const { error: signInError } =
           await supabase.auth.signInWithPassword({
@@ -77,7 +124,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
           } else if (/confirm|verif/i.test(signInError.message)) {
             setError("Please verify your email before logging in.");
           } else {
-            setError(signInError.message);
+            setError(humanizeAuthError(signInError.message));
           }
           return;
         }
@@ -87,7 +134,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
     } catch (err) {
       setError(
         err instanceof Error
-          ? err.message
+          ? humanizeAuthError(err.message)
           : "Network error. Please check your connection and try again."
       );
     } finally {
@@ -125,16 +172,20 @@ export default function AuthForm({ mode }: { mode: Mode }) {
           : "Log in to access the autonomous workspace."}
       </p>
 
-      {error && (
+      {(!configured || error) && (
         <div
           role="alert"
           className="mb-4 flex items-start gap-2 rounded-xl border border-kore-danger/40 bg-kore-danger/10 px-3 py-2.5 text-sm text-red-300"
         >
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-          <span>{error}</span>
+          <span>
+            {!configured
+              ? "Authentication is not configured on this deployment. The server needs NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY (plus the schema from supabase/schema.sql) before accounts can be created."
+              : error}
+          </span>
         </div>
       )}
-      {info && (
+      {configured && info && (
         <div
           role="status"
           className="mb-4 rounded-xl border border-kore-accent/40 bg-kore-accent/10 px-3 py-2.5 text-sm text-emerald-300"
@@ -226,6 +277,11 @@ export default function AuthForm({ mode }: { mode: Mode }) {
             </Link>
           </>
         )}
+      </p>
+
+      <p className="mt-4 flex items-center justify-center gap-1.5 text-center text-xs text-kore-muted/70">
+        <ShieldCheck className="h-3.5 w-3.5" aria-hidden />
+        Passwords are hashed by Supabase Auth. ZeroKore never sees them.
       </p>
     </motion.div>
   );

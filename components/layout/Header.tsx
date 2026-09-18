@@ -1,9 +1,10 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Menu, Circle } from "lucide-react";
+import { Menu, Circle, Cpu } from "lucide-react";
 import type { AgentMode } from "@/types";
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils";
+import { EASE } from "@/lib/motion";
 
 interface HeaderProps {
   onMenu: () => void;
@@ -14,40 +15,62 @@ interface HeaderProps {
 }
 
 const MODE_LABEL: Record<AgentMode, string> = {
-  coding: "Coding Agent",
-  research: "Research Agent",
-  general: "General Assistant",
+  coding: "Coding agent",
+  research: "Research agent",
+  general: "General assistant",
 };
 
-export default function Header({ onMenu, title, mode, status, provider }: HeaderProps) {
+const STATUS_LABEL: Record<HeaderProps["status"], string> = {
+  idle: "Idle",
+  loading: "Working",
+  error: "Error",
+};
+
+export default function Header({
+  onMenu,
+  title,
+  mode,
+  status,
+  provider,
+}: HeaderProps) {
   return (
-    <header className="glass-bar glass-sheen sticky top-0 z-20 flex items-center gap-3 px-3 py-2.5 sm:px-4">        <motion.button
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
+    <header className="glass-bar glass-sheen sticky top-0 z-20 flex items-center gap-2 px-3 py-2.5 sm:gap-3 sm:px-4">
+      <motion.button
+        whileTap={{ scale: 0.94 }}
+        transition={{ duration: 0.12, ease: EASE }}
         onClick={onMenu}
-        className="rounded-md p-2 text-kore-muted transition hover:bg-kore-bg hover:text-white lg:hidden"
-        aria-label="Open sidebar"
+        className="rounded-md p-2 text-kore-muted transition-colors duration-150 hover:bg-white/[0.04] hover:text-white lg:hidden"
+        aria-label="Open navigation"
       >
         <Menu className="h-5 w-5" aria-hidden />
       </motion.button>
 
       <div className="min-w-0 flex-1">
-        <h1 className="truncate text-sm font-semibold text-white sm:text-base" title={title}>
+        <h1
+          className="truncate text-sm font-semibold tracking-tight text-white"
+          title={title}
+        >
           {title}
         </h1>
-        <p className="hidden truncate font-mono text-xs text-kore-muted sm:block">
-          {MODE_LABEL[mode]} · {provider}
+        <p className="mt-0.5 hidden items-center gap-1.5 truncate text-xs text-kore-muted sm:flex">
+          <span className="truncate">{MODE_LABEL[mode]}</span>
+          <span aria-hidden className="text-kore-border">
+            ·
+          </span>
+          <Cpu className="h-3 w-3 shrink-0" aria-hidden />
+          <span className="truncate">{provider}</span>
         </p>
       </div>
 
       <div
-        className="glass-subtle flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 font-mono text-xs"
+        className="glass-subtle flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1"
         role="status"
-        aria-label={status === "loading" ? "Agent working" : status === "error" ? "Error" : "Idle"}
+        aria-live="polite"
+        aria-label={`Agent status: ${STATUS_LABEL[status]}`}
       >
         <Circle
           className={cn(
-            "h-2 w-2 fill-current",
+            "h-1.5 w-1.5 fill-current",
             status === "loading"
               ? "animate-pulse text-kore-warn"
               : status === "error"
@@ -56,8 +79,8 @@ export default function Header({ onMenu, title, mode, status, provider }: Header
           )}
           aria-hidden
         />
-        <span className="hidden text-kore-muted sm:inline">
-          {status === "loading" ? "WORKING" : status === "error" ? "ERROR" : "IDLE"}
+        <span className="font-mono text-[10px] uppercase tracking-wider text-kore-muted">
+          {STATUS_LABEL[status]}
         </span>
       </div>
     </header>

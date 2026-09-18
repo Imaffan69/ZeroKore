@@ -9,6 +9,7 @@ import type {
   AgentMode,
   Artifact,
   ChatMessage,
+  ProviderPreference,
 } from "@/types";
 import {
   chatWithCascade,
@@ -16,7 +17,11 @@ import {
   type ToolSpec,
 } from "./cascade-router";
 import { executeTool, toolSpecs, type ToolContext } from "./tools";
-import { embedText, searchSimilarMemories } from "./memory";
+import {
+  embedText,
+  searchSimilarMemories,
+  keywordSearchMemories,
+} from "./memory";
 
 export const MAX_TOOL_ITERATIONS = 8;
 const HISTORY_LIMIT = 30;
@@ -52,6 +57,8 @@ export interface AgentRunInput {
   message: string;
   conversationId: string | null;
   mode: AgentMode;
+  /** Explicit model choice from the model picker; null/"auto" = cascade. */
+  preferredProvider?: ProviderPreference | null;
 }
 
 export interface AgentRunResult {
@@ -72,6 +79,7 @@ function makeTitle(message: string): string {
 
 export async function runAgent(input: AgentRunInput): Promise<AgentRunResult> {
   const { supabase, userId, message, mode } = input;
+  const preferred = input.preferredProvider ?? "auto";
   const events: AgentEvent[] = [event("agent_started", "[Agent Started]")];
   const tavilyAvailable = !!process.env.TAVILY_API_KEY;
   const specs: ToolSpec[] = toolSpecs(tavilyAvailable);
@@ -119,12 +127,18 @@ export async function runAgent(input: AgentRunInput): Promise<AgentRunResult> {
   // --- Memory recall (graceful: continue without memory on failure) ---
   let memoryBlock = "";
   try {
-    const hits = await searchSimilarMemories(
+    let hits = await searchSimilarMemories(
       supabase,
       userId,
       embedText(message),
       5
     );
+    // Vector recall can come back empty when the pgvector index is missing or
+    // the embedding distance never clears the threshold. Fall back to keyword
+    // matching so an otherwise valid request still gets its context.
+    if (hits.length === 0) {
+      hits = await keywordSearchMemories(supabase, userId, message, 5);
+    }
     if (hits.length > 0) {
       events.push(event("memory_retrieved", "[Memory Retrieved]"));
       memoryBlock = `Relevant long-term memory about this user:\n${hits
@@ -162,7 +176,10 @@ export async function runAgent(input: AgentRunInput): Promise<AgentRunResult> {
   const allToolCalls: any[] = [];
 
   for (let i = 0; i < MAX_TOOL_ITERATIONS; i++) {
-    const turn = await chatWithCascade(messages, { tools: specs });
+    const turn = await chatWithCascade(messages, {
+      tools: specs,
+      preferred,
+    });
     provider = turn.provider;
     if (turn.fallbackFrom && !fallbackFrom) {
       fallbackFrom = turn.fallbackFrom;
@@ -229,7 +246,7 @@ export async function runAgent(input: AgentRunInput): Promise<AgentRunResult> {
       lastCalls.length > 0 &&
       lastCalls.every((n) => n === "store_memory" || n === "search_memory")
     ) {
-      const follow = await chatWithCascade(messages);
+      const follow = await chatWithCascade(messages, { preferred });
       provider = follow.provider;
       if (follow.fallbackFrom && !fallbackFrom) {
         fallbackFrom = follow.fallbackFrom;
