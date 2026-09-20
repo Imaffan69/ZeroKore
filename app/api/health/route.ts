@@ -27,6 +27,11 @@ export async function GET() {
     // Without a valid ENCRYPTION_KEY the Secrets environment refuses to store
     // values (AES-256-GCM) rather than writing them in plaintext.
     encryption: isEncryptionConfigured() ? "configured" : "not configured",
+    // Required to persist GitHub tokens and read secret summaries, both of which
+    // live in tables with RLS and no client policies.
+    serviceRole: process.env.SUPABASE_SERVICE_ROLE_KEY
+      ? "configured"
+      : "not configured",
     timestamp: new Date().toISOString(),
   });
 }

@@ -42,6 +42,7 @@ interface HealthData {
   search: string;
   github: string;
   encryption: string;
+  serviceRole: string;
 }
 
 export interface SettingsPanelProps {
@@ -502,6 +503,12 @@ export default function SettingsPanel({
                     label="GitHub OAuth"
                     ok={health ? health.github === "configured" : false}
                     detail={health?.github ?? "checking…"}
+                    warn
+                  />
+                  <StatusRow
+                    label="Secret storage (service role)"
+                    ok={health ? health.serviceRole === "configured" : false}
+                    detail={health?.serviceRole ?? "checking…"}
                     warn
                   />
                   <StatusRow
