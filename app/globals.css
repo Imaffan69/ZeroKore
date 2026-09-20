@@ -12,29 +12,141 @@ body {
 }
 
 body {
-  background-color: #060607;
-  color: #ededed;
+  background-color: #030304;
+  color: #f4f4f6;
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
     "Helvetica Neue", Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
 }
 
-/* Soft grey ambient wash for landing / empty states.
-   Replaces the old grid-line backdrop: no ruling lines anywhere on the site. */
+/* Deep black canvas with a whisper of grey light.
+   No ruling lines anywhere: the old grid backdrop is gone for good. */
 .kore-ambient {
   background:
     radial-gradient(
-      62% 46% at 50% 0%,
-      rgba(255, 255, 255, 0.075),
-      transparent 70%
+      58% 42% at 50% -6%,
+      rgba(255, 255, 255, 0.055),
+      transparent 68%
     ),
     radial-gradient(
-      46% 40% at 88% 12%,
-      rgba(255, 255, 255, 0.035),
-      transparent 75%
+      40% 34% at 86% 8%,
+      rgba(255, 255, 255, 0.025),
+      transparent 76%
     );
 }
+
+/* Full-bleed section rhythm used across every marketing page. */
+.kore-section {
+  position: relative;
+  width: 100%;
+  padding-block: clamp(4.5rem, 9vw, 8.5rem);
+}
+.kore-shell {
+  width: 100%;
+  max-width: 1240px;
+  margin-inline: auto;
+  padding-inline: clamp(1.15rem, 4vw, 2.5rem);
+}
+/* Full-viewport hero with the particle field behind it. */
+.kore-hero {
+  position: relative;
+  display: flex;
+  min-height: 100svh;
+  align-items: center;
+  overflow: hidden;
+}
+
+/* Hairline dividers (not a grid) for section separation. */
+.kore-hairline {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.14),
+    transparent
+  );
+}
+
+/* Fine grain so large black areas do not band on OLED screens. */
+.kore-noise::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Slow marquee strip (auctus-style repeating claim under the hero). */
+@keyframes kore-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+.kore-marquee {
+  display: flex;
+  width: max-content;
+  animation: kore-marquee 38s linear infinite;
+}
+.kore-marquee-slow {
+  animation-duration: 60s;
+}
+.kore-marquee-mask {
+  mask-image: linear-gradient(
+    90deg,
+    transparent,
+    #000 12%,
+    #000 88%,
+    transparent
+  );
+  -webkit-mask-image: linear-gradient(
+    90deg,
+    transparent,
+    #000 12%,
+    #000 88%,
+    transparent
+  );
+}
+
+/* Pointer-tracked glow that follows the cursor inside a card. */
+.kore-spotlight {
+  position: relative;
+}
+.kore-spotlight::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background: radial-gradient(
+    340px circle at var(--kx, 50%) var(--ky, 0%),
+    rgba(255, 255, 255, 0.09),
+    transparent 62%
+  );
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+}
+.kore-spotlight:hover::before {
+  opacity: 1;
+}
+
+/* Reveal on scroll (driven by an IntersectionObserver hook). */
+.kore-reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition:
+    opacity 0.6s cubic-bezier(0.32, 0.72, 0, 1),
+    transform 0.6s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.kore-reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
 
 /* Scrollbars */
 * {
@@ -82,6 +194,13 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .kore-caret {
     animation: none;
+  }
+  .kore-marquee {
+    animation: none;
+  }
+  .kore-reveal {
+    opacity: 1;
+    transform: none;
   }
   .glass-interactive {
     transition: none;

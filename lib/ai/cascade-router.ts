@@ -308,25 +308,38 @@ function toGeminiContents(messages: ChatMsg[]) {
   const system: string[] = [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const contents: any[] = [];
+  const pushToolResponses = (group: ChatMsg[]) => {
+    // Gemini requires every functionResponse that answers one model turn to
+    // live in a SINGLE user turn. Emitting them as consecutive user turns
+    // fails with 400 ("function response turn comes immediately after a
+    // function call turn"), which is exactly what multi-tool replies produced.
+    contents.push({
+      role: "user",
+      parts: group.map((m) => ({
+        functionResponse: {
+          name: m.toolName ?? "tool",
+          response: { result: m.content },
+        },
+      })),
+    });
+  };
+  let toolGroup: ChatMsg[] = [];
+  const flushTools = () => {
+    if (toolGroup.length > 0) {
+      pushToolResponses(toolGroup);
+      toolGroup = [];
+    }
+  };
   for (const m of messages) {
     if (m.role === "system") {
       system.push(m.content);
       continue;
     }
     if (m.role === "tool") {
-      contents.push({
-        role: "user",
-        parts: [
-          {
-            functionResponse: {
-              name: m.toolName ?? "tool",
-              response: { result: m.content },
-            },
-          },
-        ],
-      });
+      toolGroup.push(m);
       continue;
     }
+    flushTools();
     if (m.role === "assistant") {
       // Gemini expects the model turn to carry the functionCall parts that the
       // following functionResponse answers. Empty text parts are invalid.
@@ -343,10 +356,11 @@ function toGeminiContents(messages: ChatMsg[]) {
     if (!m.content) continue;
     contents.push({ role: "user", parts: [{ text: m.content }] });
   }
+  flushTools();
   return { system: system.join("\n\n"), contents };
 }
 
-async function callGemini(
+async function geminiOnce(
   apiKey: string,
   model: string,
   messages: ChatMsg[],
@@ -429,6 +443,116 @@ async function callGemini(
   } finally {
     clearTimeout(timer);
   }
+}
+
+/**
+ * Chat models to try, best first.
+ *
+ * A model id can be retired by the provider at any time — and a retired id
+ * answers with 404, which is what made the Gemini option look "broken" while
+ * the other three providers kept working. So a 404 is treated as "try the next
+ * name", never as a user-facing failure.
+ */
+const GEMINI_MODEL_CANDIDATES = [
+  "gemini-2.5-flash",
+  "gemini-2.0-flash",
+  "gemini-flash-latest",
+  "gemini-2.5-pro",
+  "gemini-pro-latest",
+  "gemini-1.5-flash",
+];
+
+/** Resolved once per server process: the last model name that answered. */
+let geminiModelInUse: string | null = null;
+
+/** Ask the API which models this key can actually call. */
+async function discoverGeminiModel(apiKey: string): Promise<string | null> {
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models?pageSize=200&key=${apiKey}`,
+      { signal: AbortSignal.timeout(8_000) }
+    );
+    if (!res.ok) return null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data: any = await res.json();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const models: any[] = Array.isArray(data?.models) ? data.models : [];
+    const usable = models
+      .filter(
+        (m) =>
+          Array.isArray(m?.supportedGenerationMethods) &&
+          m.supportedGenerationMethods.includes("generateContent")
+      )
+      .map((m) => String(m?.name ?? "").replace(/^models\//, ""))
+      .filter((n) => !!n && !/embedding|aqa|imagen|veo|tts|image/i.test(n));
+    // A flash model is the cheapest capable option; otherwise take what exists.
+    return (
+      usable.find((n) => /flash/.test(n) && !/exp|thinking/.test(n)) ??
+      usable[0] ??
+      null
+    );
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Call Gemini, healing a stale model name on the way through.
+ *
+ * Order: the model that last worked, the configured model, then the known
+ * candidates, and finally whatever `ListModels` reports for this key. The first
+ * answer wins and is remembered for the rest of the process.
+ */
+async function callGemini(
+  apiKey: string,
+  model: string,
+  messages: ChatMsg[],
+  tools: ToolSpec[] | undefined,
+  timeoutMs: number
+): Promise<ProviderChatResult> {
+  const tried = new Set<string>();
+  const order = [geminiModelInUse, model, ...GEMINI_MODEL_CANDIDATES].filter(
+    (m): m is string => !!m
+  );
+
+  let lastError: unknown = null;
+  for (const candidate of order) {
+    if (tried.has(candidate)) continue;
+    tried.add(candidate);
+    try {
+      const result = await geminiOnce(
+        apiKey,
+        candidate,
+        messages,
+        tools,
+        timeoutMs
+      );
+      geminiModelInUse = candidate;
+      return result;
+    } catch (err) {
+      lastError = err;
+      const notFound = err instanceof RetryableError && err.status === 404;
+      if (!notFound) throw err;
+    }
+  }
+
+  // Nothing known worked — ask the API what it serves and try that once.
+  const discovered = await discoverGeminiModel(apiKey);
+  if (discovered && !tried.has(discovered)) {
+    const result = await geminiOnce(
+      apiKey,
+      discovered,
+      messages,
+      tools,
+      timeoutMs
+    );
+    geminiModelInUse = discovered;
+    return result;
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new RetryableError("Gemini has no available model for this API key.", 404);
 }
 
 const OPENAI_BASES: Record<string, string> = {

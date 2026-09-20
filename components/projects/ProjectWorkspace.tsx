@@ -9,6 +9,7 @@ import {
   UploadCloud,
   Loader2,
   CheckCircle2,
+  SquareTerminal,
   TerminalSquare,
   LayoutGrid,
 } from "lucide-react";
@@ -17,6 +18,7 @@ import ToolBar from "@/components/agent/ToolBar";
 import EnvironmentsPanel, {
   type TranscriptLine,
 } from "@/components/projects/EnvironmentsPanel";
+import ProjectShell from "@/components/projects/ProjectShell";
 import type { FileMeta } from "@/components/projects/FilesPanel";
 import { cn } from "@/lib/utils";
 import { EASE } from "@/lib/motion";
@@ -55,8 +57,10 @@ const TONE_BY_EVENT: Record<AgentEvent["kind"], TranscriptLine["tone"]> = {
 
 export default function ProjectWorkspace({
   initialProject,
+  username,
 }: {
   initialProject: Project;
+  username: string | null;
 }) {
   const [project, setProject] = useState<Project>(initialProject);
   const [files, setFiles] = useState<FileMeta[]>([]);
@@ -75,7 +79,7 @@ export default function ProjectWorkspace({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
-  const [panel, setPanel] = useState<"chat" | "environment">("chat");
+  const [panel, setPanel] = useState<"chat" | "environment" | "terminal">("chat");
 
   const [pushing, setPushing] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -271,7 +275,7 @@ export default function ProjectWorkspace({
       {/* Header */}
       <header className="glass-bar glass-sheen flex shrink-0 flex-wrap items-center gap-2 px-3 py-2.5 sm:px-4">
         <Link
-          href="/dashboard"
+          href={username ? `/${username}` : "/dashboard"}
           className="rounded-lg p-2 text-kore-muted transition-colors duration-150 hover:bg-white/[0.06] hover:text-white"
           aria-label="Back to your projects"
           title="All projects"
@@ -341,6 +345,7 @@ export default function ProjectWorkspace({
           [
             { id: "chat" as const, label: "Agent", icon: TerminalSquare },
             { id: "environment" as const, label: "Environment", icon: LayoutGrid },
+            { id: "terminal" as const, label: "Terminal", icon: SquareTerminal },
           ] as const
         ).map((t) => {
           const active = panel === t.id;
@@ -457,6 +462,17 @@ export default function ProjectWorkspace({
             transcript={transcript}
             onChanged={loadProject}
           />
+        </section>
+
+        {/* Terminal */}
+        <section
+          aria-label="Project terminal"
+          className={cn(
+            "min-h-0 flex-col xl:col-span-2 xl:flex xl:h-80",
+            panel === "terminal" ? "flex" : "hidden xl:flex"
+          )}
+        >
+          <ProjectShell slug={project.slug} onFilesChanged={loadProject} className="h-full w-full" />
         </section>
       </div>
 
