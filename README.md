@@ -74,7 +74,7 @@ zerokore/
    |---|---|---|
    | `NEXT_PUBLIC_SUPABASE_URL` | yes | Supabase project URL |
    | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | yes | Supabase anon key |
-   | `SUPABASE_SERVICE_ROLE_KEY` | for admin ops | Service-role key (server only) |
+   | `SUPABASE_SERVICE_ROLE_KEY` | for GitHub + secrets | Service-role key (server only). Required to store GitHub OAuth tokens and read secret key names — both tables are RLS-locked with no client policies. |
    | `GROQ_API_KEY` | at least one provider | Groq |
    | `DEEPSEEK_API_KEY` | at least one provider | DeepSeek |
    | `SAMBANOVA_API_KEY` | at least one provider | SambaNova |
