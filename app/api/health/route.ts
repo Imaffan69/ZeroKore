@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { providerCatalog } from "@/lib/ai/cascade-router";
+import { isEncryptionConfigured } from "@/lib/crypto";
 
 /**
  * Truthful health/config snapshot. Public (read-only, no secrets):
- * tells the UI which of the four models are configured and whether the
- * GitHub OAuth integration is set up — never returns key values.
+ * tells the UI which of the four models are configured, whether the
+ * GitHub OAuth integration is set up, and whether project-secret
+ * encryption has a key — never returns key values.
  */
 export async function GET() {
   const models = providerCatalog();
@@ -22,6 +24,9 @@ export async function GET() {
     models,
     search: process.env.TAVILY_API_KEY ? "configured" : "not configured",
     github: github ? "configured" : "not configured",
+    // Without a valid ENCRYPTION_KEY the Secrets environment refuses to store
+    // values (AES-256-GCM) rather than writing them in plaintext.
+    encryption: isEncryptionConfigured() ? "configured" : "not configured",
     timestamp: new Date().toISOString(),
   });
 }

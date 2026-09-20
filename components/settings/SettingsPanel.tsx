@@ -41,6 +41,7 @@ interface HealthData {
   models: ProviderInfo[];
   search: string;
   github: string;
+  encryption: string;
 }
 
 export interface SettingsPanelProps {
@@ -503,7 +504,24 @@ export default function SettingsPanel({
                     detail={health?.github ?? "checking…"}
                     warn
                   />
+                  <StatusRow
+                    label="Project secrets (AES-256-GCM)"
+                    ok={health ? health.encryption === "configured" : false}
+                    detail={health?.encryption ?? "checking…"}
+                    warn
+                  />
                 </div>
+                {health?.encryption === "not configured" && (
+                  <p className="mt-3 text-xs leading-relaxed text-kore-muted">
+                    Add <span className="font-mono">ENCRYPTION_KEY</span> to the
+                    server environment to store project secrets. Generate one with{" "}
+                    <span className="font-mono">
+                      node -e &quot;console.log(require(&apos;crypto&apos;).randomBytes(32).toString(&apos;base64&apos;))&quot;
+                    </span>
+                    . Until then the Secrets environment reports that it is
+                    unconfigured instead of storing values in plaintext.
+                  </p>
+                )}
               </motion.section>
 
               <motion.section

@@ -17,11 +17,17 @@ import {
 import { cn } from "@/lib/utils";
 import { EASE, press } from "@/lib/motion";
 import type { GitHubRepo } from "@/types/projects";
+import type { GitHubStatus } from "@/types";
 
-/** Import a GitHub repository the signed-in user already has access to. */
+/**
+ * Import a GitHub repository the signed-in user already has access to.
+ * When no account is connected yet this offers the OAuth connect step
+ * directly, instead of only pointing at Settings.
+ */
 export default function ImportRepoPanel({ onCancel }: { onCancel: () => void }) {
   const router = useRouter();
   const [repos, setRepos] = useState<GitHubRepo[] | null>(null);
+  const [gh, setGh] = useState<GitHubStatus | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<GitHubRepo | null>(null);
@@ -31,6 +37,12 @@ export default function ImportRepoPanel({ onCancel }: { onCancel: () => void }) 
   const load = useCallback(async () => {
     setNote(null);
     setRepos(null);
+    try {
+      const status = await fetch("/api/github");
+      if (status.ok) setGh(await status.json());
+    } catch {
+      setGh(null);
+    }
     try {
       const res = await fetch("/api/github/repos");
       const data = await res.json();
@@ -121,6 +133,23 @@ export default function ImportRepoPanel({ onCancel }: { onCancel: () => void }) 
             </Link>
           </span>
         </p>
+      )}
+
+      {gh?.configured && !gh.connected && (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <motion.a
+            whileHover={{ translateY: -1 }}
+            whileTap={press}
+            href="/api/github/oauth"
+            className="inline-flex items-center gap-2 rounded-full bg-white px-3.5 py-1.5 text-xs font-semibold text-black transition hover:bg-white/85"
+          >
+            <Github className="h-3.5 w-3.5" aria-hidden />
+            Connect GitHub
+          </motion.a>
+          <span className="text-[11px] text-kore-muted">
+            You will be sent to GitHub to authorise read access, then back here.
+          </span>
+        </div>
       )}
 
       {repos === null ? (

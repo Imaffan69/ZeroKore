@@ -15,7 +15,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { EASE, press } from "@/lib/motion";
+import { press } from "@/lib/motion";
 
 /**
  * The project's files: a real file tree over `project_files`, edited in a

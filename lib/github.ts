@@ -136,7 +136,6 @@ export async function fetchRepoTree(
   }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const data: any = await res.json();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const paths = (Array.isArray(data?.tree) ? data.tree : [])
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .filter((n: any) => n?.type === "blob" && typeof n.path === "string")
