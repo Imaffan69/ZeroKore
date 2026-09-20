@@ -58,8 +58,11 @@ zerokore/
 2. **Supabase project** — create a project at https://supabase.com, then run
    `supabase/schema.sql` in the SQL editor. It creates extensions
    (`uuid-ossp`, `vector`), tables (`profiles`, `user_usage`, `agent_memory`,
-   `conversations`, `messages`), RLS policies, the signup trigger
-   (`handle_new_user`), and the `match_memories` vector-recall RPC.
+   `conversations`, `messages`, `github_connections`, `projects`,
+   `project_files`, `project_environments`, `project_secrets`), RLS policies,
+   the signup trigger (`handle_new_user`), and the `match_memories` vector-recall
+   RPC. The file is idempotent, so re-running it after an update applies only
+   what is missing.
 
 3. **Environment** — copy and fill:
 
@@ -77,6 +80,26 @@ zerokore/
    | `SAMBANOVA_API_KEY` | at least one provider | SambaNova |
    | `GEMINI_API_KEY` | at least one provider | Gemini |
    | `TAVILY_API_KEY` | no | Web search (agent continues without it) |
+   | `GITHUB_CLIENT_ID` | for GitHub import/push | OAuth app client id |
+   | `GITHUB_CLIENT_SECRET` | for GitHub import/push | OAuth app client secret |
+   | `ENCRYPTION_KEY` | for project secrets | 32-byte key (base64 or 64-char hex) |
+
+   `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` come from an OAuth app at
+   https://github.com/settings/developers with the callback URL set to
+   `https://<your-domain>/api/github/oauth`. Without them the import picker
+   reports that GitHub is unconfigured instead of failing silently.
+
+   `ENCRYPTION_KEY` encrypts project environment variables with AES-256-GCM
+   before they are stored. Generate one with:
+
+   ```bash
+   node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+   ```
+
+   Without it the Secrets environment stays read-only and says why — values are
+   never written in plaintext. `/api/health` reports the live state of every
+   server-side integration, so it is the fastest way to confirm a deployment is
+   fully configured.
 
 4. **Run**
 
@@ -136,6 +159,15 @@ Stop cancels the frontend request; the backend always caps iterations.
   escaped before rendering.
 - Request size limits, tool-iteration cap, secret-refusal in `store_memory`.
 - Structured server logs contain events only — no keys, tokens, or passwords.
+- Response headers from `next.config.ts`: `X-Content-Type-Options: nosniff`,
+  `Referrer-Policy: strict-origin-when-cross-origin`, `X-Frame-Options:
+  SAMEORIGIN`, and a `Permissions-Policy` that denies camera, microphone,
+  geolocation, and payment. HSTS is set by the platform.
+- Project environment variables are encrypted with AES-256-GCM before insert;
+  `project_secrets` has RLS with no client policy, so values are never readable
+  from the browser.
+- GitHub tokens live in `github_connections` (no client policies) and are read
+  only inside route handlers after ownership checks.
 
 ## Troubleshooting
 
@@ -150,4 +182,7 @@ Stop cancels the frontend request; the backend always caps iterations.
 | Search says unavailable | Set `TAVILY_API_KEY` (optional) |
 | Memory empty / no recall | Normal until the agent stores facts; check `agent_memory` rows |
 | 429 on first request | Clock/date skew or stale row — check `user_usage` |
+| Import says "GitHub is not configured on the server" | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` are unset. Create the OAuth app, set the callback URL to `https://<domain>/api/github/oauth`, add both variables, then redeploy. `/api/health` should report `github: configured`. |
+| Secrets environment says "Set ENCRYPTION_KEY" | Generate a 32-byte key (`node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`), add it as `ENCRYPTION_KEY`, redeploy. `/api/health` should report `encryption: configured`. |
+| Live config unknown | `curl -sS https://<domain>/api/health` — reports models, database, auth, search, GitHub, and encryption state without exposing any value. |
 | Build errors about Supabase env | Build is static-safe; runtime throws clear errors when keys are missing |
