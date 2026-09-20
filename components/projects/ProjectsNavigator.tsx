@@ -48,7 +48,13 @@ const ACTIONS = [
   },
 ] as const;
 
-export default function ProjectsNavigator({ email }: { email: string }) {
+export default function ProjectsNavigator({
+  email,
+  username,
+}: {
+  email: string;
+  username: string | null;
+}) {
   const [projects, setProjects] = useState<Project[] | null>(null);
   const [listError, setListError] = useState<string | null>(null);
   const [mode, setMode] = useState<Mode>("browse");
@@ -141,7 +147,14 @@ export default function ProjectsNavigator({ email }: { email: string }) {
             className="font-mono text-[11px] text-kore-muted"
             title={email}
           >
-            {email}
+            {username ? (
+              <>
+                zerokore.vercel.app/
+                <span className="text-white">{username}</span>
+              </>
+            ) : (
+              email
+            )}
           </motion.p>
         </motion.header>
 
@@ -188,10 +201,18 @@ export default function ProjectsNavigator({ email }: { email: string }) {
 
         <AnimatePresence mode="wait">
           {mode === "create" && (
-            <CreateProjectPanel key="create" onCancel={() => setMode("browse")} />
+            <CreateProjectPanel
+              key="create"
+              username={username}
+              onCancel={() => setMode("browse")}
+            />
           )}
           {mode === "import" && (
-            <ImportRepoPanel key="import" onCancel={() => setMode("browse")} />
+            <ImportRepoPanel
+              key="import"
+              username={username}
+              onCancel={() => setMode("browse")}
+            />
           )}
         </AnimatePresence>
 
@@ -255,6 +276,7 @@ export default function ProjectsNavigator({ email }: { email: string }) {
                 <ProjectWidget
                   key={project.id}
                   project={project}
+                  username={username}
                   onDelete={deleteProject}
                 />
               ))}

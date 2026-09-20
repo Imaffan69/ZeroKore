@@ -5,12 +5,14 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { FolderPlus, Loader2, X } from "lucide-react";
 import { EASE, press } from "@/lib/motion";
-import { slugify } from "@/lib/slug";
+import { slugify, projectPath } from "@/lib/slug";
 
 /** Create-project panel: name becomes the project's URL. */
 export default function CreateProjectPanel({
+  username,
   onCancel,
 }: {
+  username: string | null;
   onCancel: () => void;
 }) {
   const router = useRouter();
@@ -39,7 +41,7 @@ export default function CreateProjectPanel({
         setError(data?.error ?? "Could not create the project.");
         return;
       }
-      router.push(`/projects/${data.project.slug}`);
+      router.push(projectPath(username, data.project.slug));
     } catch {
       setError("Connection failed while creating the project.");
     } finally {

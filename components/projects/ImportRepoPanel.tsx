@@ -18,13 +18,20 @@ import { cn } from "@/lib/utils";
 import { EASE, press } from "@/lib/motion";
 import type { GitHubRepo } from "@/types/projects";
 import type { GitHubStatus } from "@/types";
+import { projectPath } from "@/lib/slug";
 
 /**
  * Import a GitHub repository the signed-in user already has access to.
  * When no account is connected yet this offers the OAuth connect step
  * directly, instead of only pointing at Settings.
  */
-export default function ImportRepoPanel({ onCancel }: { onCancel: () => void }) {
+export default function ImportRepoPanel({
+  username,
+  onCancel,
+}: {
+  username: string | null;
+  onCancel: () => void;
+}) {
   const router = useRouter();
   const [repos, setRepos] = useState<GitHubRepo[] | null>(null);
   const [gh, setGh] = useState<GitHubStatus | null>(null);
@@ -95,7 +102,7 @@ export default function ImportRepoPanel({ onCancel }: { onCancel: () => void }) 
         setError(data?.error ?? "Could not import that repository.");
         return;
       }
-      router.push(`/projects/${data.project.slug}`);
+      router.push(projectPath(username, data.project.slug));
     } catch {
       setError("Connection failed while importing the repository.");
     } finally {

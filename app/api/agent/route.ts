@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { checkAndIncrementUsage } from "@/lib/usage";
+import { checkAndIncrementUsage, refundUsage } from "@/lib/usage";
 import { runAgent } from "@/lib/ai/agent";
 import { applyArtifactToProject } from "@/lib/projects";
 import type { AgentMode, AgentResponseBody, ProviderPreference } from "@/types";
@@ -173,12 +173,14 @@ export async function POST(req: NextRequest) {
     console.log(JSON.stringify({ event: "agent_failed" }));
     const msg =
       err instanceof Error ? err.message : "Agent request failed.";
+    // A failed call produced nothing, so it is not charged.
+    const refunded = await refundUsage(supabase, user.id, usageCheck.usage);
     // Provider/config failures → 502; internal validation → 400/500.
-    const status = /provider|configured/i.test(msg) ? 502 : 500;
+    const status = /provider|configured|model/i.test(msg) ? 502 : 500;
     return NextResponse.json(
       {
         error: msg,
-        usage: usageCheck.usage,
+        usage: refunded,
       },
       { status }
     );

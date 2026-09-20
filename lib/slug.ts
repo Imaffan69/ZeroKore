@@ -7,6 +7,22 @@
 
 export const MAX_SLUG_LENGTH = 60;
 
+/**
+ * The canonical address of a project: `/<username>/<project-slug>`.
+ *
+ * Older links used `/projects/<slug>`. That route still exists and redirects
+ * here, but it is no longer what the app links to — a project's address always
+ * carries the person it belongs to. Accounts without a username yet (a database
+ * that has not run the username upgrade) fall back to the legacy path so
+ * nothing breaks in the meantime.
+ */
+export function projectPath(
+  username: string | null | undefined,
+  slug: string
+): string {
+  return username ? `/${username}/${slug}` : `/projects/${slug}`;
+}
+
 export function slugify(input: string): string {
   const base = input
     .normalize("NFKD")

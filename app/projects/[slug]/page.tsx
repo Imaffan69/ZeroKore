@@ -5,6 +5,8 @@ import { FolderOpen } from "lucide-react";
 import ProjectWorkspace from "@/components/projects/ProjectWorkspace";
 import { createClient } from "@/lib/supabase/server";
 import { getOwnedProject } from "@/lib/projects";
+import { ensureProfile } from "@/lib/profiles";
+import { redirect } from "next/navigation";
 
 type Params = { params: Promise<{ slug: string }> };
 
@@ -26,6 +28,7 @@ export default async function ProjectPage({ params }: Params) {
   await cookies();
 
   let project = null;
+  let profile = null;
   let degraded = false;
   try {
     const supabase = await createClient();
@@ -34,10 +37,14 @@ export default async function ProjectPage({ params }: Params) {
     } = await supabase.auth.getUser();
     if (user) {
       project = await getOwnedProject(supabase, user.id, slug);
+      profile = await ensureProfile(supabase, user);
     }
   } catch {
     degraded = true;
   }
+
+  // Canonical address always carries the owner's username.
+  if (project && profile?.username) redirect(`/${profile.username}/${slug}`);
 
   if (!project) {
     return (
@@ -65,5 +72,5 @@ export default async function ProjectPage({ params }: Params) {
     );
   }
 
-  return <ProjectWorkspace initialProject={project} />;
+  return <ProjectWorkspace initialProject={project} username={null} />;
 }

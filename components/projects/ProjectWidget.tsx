@@ -6,6 +6,7 @@ import { FolderOpen, FolderPlus, Github, ArrowRight, Trash2 } from "lucide-react
 import { EASE, fadeUp, hoverLift, press } from "@/lib/motion";
 import { formatWhen } from "@/lib/slug";
 import type { Project } from "@/types/projects";
+import { projectPath } from "@/lib/slug";
 
 const SOURCE_LABEL: Record<Project["source"], string> = {
   created: "Created here",
@@ -16,9 +17,11 @@ const SOURCE_LABEL: Record<Project["source"], string> = {
 /** One project as an iOS-style glass widget on the navigator. */
 export default function ProjectWidget({
   project,
+  username,
   onDelete,
 }: {
   project: Project;
+  username: string | null;
   onDelete: (slug: string, name: string) => void;
 }) {
   return (
@@ -64,7 +67,7 @@ export default function ProjectWidget({
 
       <div className="mt-4 flex items-center gap-2">
         <Link
-          href={`/projects/${project.slug}`}
+          href={projectPath(username, project.slug)}
           className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full bg-white px-3.5 py-2 text-xs font-semibold text-black transition-transform duration-150 hover:scale-[1.02] active:scale-[0.98]"
         >
           Open project

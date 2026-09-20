@@ -18,6 +18,39 @@ create table if not exists public.profiles (
 );
 
 -- ------------------------------------------------------------
+-- Usernames: the public identity behind every project URL
+-- (`/<username>/<project>`). Added in place so a fresh install has
+-- them from the start; the idempotent block at the end of this file
+-- upgrades an existing database.
+-- ------------------------------------------------------------
+alter table public.profiles add column if not exists username text;
+alter table public.profiles add column if not exists display_name text;
+
+-- One name per person, case-insensitively.
+create unique index if not exists profiles_username_key
+  on public.profiles (lower(username))
+  where username is not null;
+
+-- Shape guard. Reserved words and slurs are rejected in the API layer
+-- (lib/username.ts) where the list can be maintained; this constraint is the
+-- backstop that keeps junk out even if a client talks to PostgREST directly.
+alter table public.profiles drop constraint if exists profiles_username_shape;
+alter table public.profiles add constraint profiles_username_shape check (
+  username is null
+  or (
+    username ~ '^[a-z0-9](?:[a-z0-9_-]*[a-z0-9])$'
+    and char_length(username) between 3 and 30
+    and lower(username) not in (
+      'admin','administrator','owner','root','superuser','moderator','staff',
+      'official','support','help','system','zerokore','api','app','auth',
+      'login','signup','settings','dashboard','projects','status','www',
+      'mail','about','pricing','terms','privacy','docs','blog','team',
+      'test','demo','null','undefined','anonymous','guest','user','me'
+    )
+  )
+);
+
+-- ------------------------------------------------------------
 -- user_usage: daily AI request counter per user.
 -- ------------------------------------------------------------
 create table if not exists public.user_usage (
@@ -178,9 +211,37 @@ language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  base text;
+  chosen text;
+  candidate text;
+  n integer := 0;
 begin
-  insert into public.profiles (id, email, role)
-  values (NEW.id, NEW.email, 'user')
+  -- Seed a username from the email local part, then make it unique and legal.
+  base := lower(split_part(coalesce(NEW.email, ''), '@', 1));
+  base := regexp_replace(base, '[^a-z0-9]+', '-', 'g');
+  base := trim(both '-' from base);
+  if char_length(base) < 3 then
+    base := 'builder';
+  end if;
+  base := left(base, 24);
+
+  -- A username chosen at signup wins, as long as it survives the same shape
+  -- rules the API enforces. Anything else falls back to the email-derived stem.
+  chosen := lower(trim(coalesce(NEW.raw_user_meta_data ->> 'username', '')));
+  if chosen ~ '^[a-z0-9](?:[a-z0-9_-]*[a-z0-9])$'
+     and char_length(chosen) between 3 and 30 then
+    base := chosen;
+  end if;
+
+  candidate := base;
+  while exists (select 1 from public.profiles p where lower(p.username) = candidate) loop
+    n := n + 1;
+    candidate := left(base, 24) || '-' || n::text;
+  end loop;
+
+  insert into public.profiles (id, email, role, username)
+  values (NEW.id, NEW.email, 'user', candidate)
   on conflict (id) do nothing;
 
   insert into public.user_usage (user_id, requests_today, last_request_date)
@@ -364,3 +425,47 @@ alter table public.conversations
   references public.projects (id) on delete set null;
 create index if not exists conversations_project_idx
   on public.conversations (project_id, created_at desc);
+
+-- ============================================================
+-- Upgrade block: usernames for accounts that predate them.
+-- Idempotent — safe to run on its own in the SQL editor, and safe to
+-- re-run after future changes. Only touches rows with a null username.
+-- ============================================================
+do $$
+declare
+  r record;
+  base text;
+  candidate text;
+  n integer;
+begin
+  for r in
+    select p.id, p.email
+    from public.profiles p
+    where p.username is null
+    order by p.created_at
+  loop
+    base := lower(split_part(coalesce(r.email, ''), '@', 1));
+    base := regexp_replace(base, '[^a-z0-9]+', '-', 'g');
+    base := trim(both '-' from base);
+    if char_length(base) < 3 then
+      base := 'builder-' || left(replace(r.id::text, '-', ''), 6);
+    end if;
+    base := left(base, 24);
+
+    candidate := base;
+    n := 0;
+    while exists (
+      select 1 from public.profiles p2 where lower(p2.username) = candidate
+    ) loop
+      n := n + 1;
+      candidate := left(base, 24) || '-' || n::text;
+    end loop;
+
+    update public.profiles set username = candidate where id = r.id;
+  end loop;
+end;
+$$;
+
+-- Confirm the result: every profile should now have a username.
+-- select id, username, email from public.profiles order by created_at;
+
