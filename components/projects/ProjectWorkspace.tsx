@@ -47,6 +47,8 @@ function uid(): string {
 const TONE_BY_EVENT: Record<AgentEvent["kind"], TranscriptLine["tone"]> = {
   agent_started: "info",
   memory_retrieved: "info",
+  files_context: "info",
+  skill_loaded: "info",
   tool_call: "tool",
   tool_completed: "info",
   provider_fallback: "warn",

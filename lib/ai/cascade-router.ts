@@ -41,6 +41,9 @@ export interface UnifiedToolCall {
 export interface ProviderChatResult {
   text: string;
   toolCalls: UnifiedToolCall[];
+  /** Real usage from the provider response; 0 when the provider omits it. */
+  promptTokens?: number;
+  completionTokens?: number;
 }
 
 export interface CascadeResult extends ProviderChatResult {
@@ -290,7 +293,12 @@ async function callOpenAICompatible(
         });
       }
     }
-    return { text: choice.content ?? "", toolCalls };
+    return {
+      text: choice.content ?? "",
+      toolCalls,
+      promptTokens: data?.usage?.prompt_tokens ?? 0,
+      completionTokens: data?.usage?.completion_tokens ?? 0,
+    };
   } catch (err) {
     if (err instanceof RetryableError || err instanceof FatalError) throw err;
     if (err instanceof Error && err.name === "AbortError") {
@@ -431,7 +439,12 @@ async function geminiOnce(
     if (!text && toolCalls.length === 0) {
       throw new RetryableError("Empty provider response.");
     }
-    return { text, toolCalls };
+    return {
+      text,
+      toolCalls,
+      promptTokens: data?.usageMetadata?.promptTokenCount ?? 0,
+      completionTokens: data?.usageMetadata?.candidatesTokenCount ?? 0,
+    };
   } catch (err) {
     if (err instanceof RetryableError || err instanceof FatalError) throw err;
     if (err instanceof Error && err.name === "AbortError") {

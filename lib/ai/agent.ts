@@ -17,6 +17,14 @@ import {
   type ToolSpec,
 } from "./cascade-router";
 import { executeTool, toolSpecs, type ToolContext } from "./tools";
+import { MODEL_REGISTRY } from "./cascade-router";
+import {
+  extractMentions,
+  loadMentionedFiles,
+  pickRelevantFiles,
+  fileContextBlock,
+} from "./mentions";
+import { getSkill } from "@/lib/skills";
 import {
   embedText,
   searchSimilarMemories,
@@ -71,6 +79,10 @@ export interface AgentRunResult {
   artifact: Artifact | null;
   provider: string;
   fallbackFrom?: string;
+  /** Real provider-accumulated token usage for credit settlement. */
+  promptTokens: number;
+  completionTokens: number;
+  model: string;
 }
 
 function makeTitle(message: string): string {
@@ -85,7 +97,7 @@ export async function runAgent(input: AgentRunInput): Promise<AgentRunResult> {
   const events: AgentEvent[] = [event("agent_started", "[Agent Started]")];
   const tavilyAvailable = !!process.env.TAVILY_API_KEY;
   const specs: ToolSpec[] = toolSpecs(tavilyAvailable);
-  const toolCtx: ToolContext = { supabase, userId };
+  const toolCtx: ToolContext = { supabase, userId, projectId: input.projectId ?? null };
 
   // --- Load or create conversation (ownership enforced server-side) ---
   let conversationId = input.conversationId;
@@ -156,6 +168,55 @@ export async function runAgent(input: AgentRunInput): Promise<AgentRunResult> {
     console.log(JSON.stringify({ event: "memory_search_failed" }));
   }
 
+  // --- File resolution: @mentions first, else File Picker sub-agent ---
+  let fileBlock = "";
+  try {
+    const mentioned = extractMentions(message);
+    let resolved: { path: string; content: string }[] = [];
+    if (mentioned.length > 0) {
+      resolved = await loadMentionedFiles(supabase, input.projectId ?? null, mentioned);
+      if (resolved.length > 0) {
+        events.push(
+          event("files_context", `[Files Loaded] ${resolved.length} mentioned file(s)`)
+        );
+      }
+    } else if (input.projectId) {
+      const { data: tree } = await supabase
+        .from("project_files")
+        .select("path, size")
+        .eq("project_id", input.projectId);
+      const files = (tree ?? []) as { path: string; size: number }[];
+      const picked = await pickRelevantFiles(message, files);
+      if (picked.length > 0) {
+        resolved = await loadMentionedFiles(supabase, input.projectId, picked);
+        events.push(
+          event(
+            "files_context",
+            `[Files Loaded] file picker selected ${resolved.length} file(s): ${picked.join(", ")}`
+          )
+        );
+      }
+    }
+    fileBlock = fileContextBlock(resolved);
+  } catch {
+    // context injection is best-effort; the run continues without it
+  }
+
+  // --- Skill injection: /skill-name in the message ---
+  let skillBlock = "";
+  try {
+    const skillMatch = message.match(/(^|\s)\/([a-z0-9][a-z0-9-]{1,60})/i);
+    if (skillMatch) {
+      const skill = await getSkill(skillMatch[2]);
+      if (skill) {
+        skillBlock = `Active skill "${skill.name}" — follow its guidance:\n\n${skill.content.slice(0, 12000)}`;
+        events.push(event("skill_loaded", `[Skill] ${skill.name}`));
+      }
+    }
+  } catch {
+    // unknown or unreadable skill → proceed without it
+  }
+
   // --- Build context ---
   const chatHistory: ChatMsg[] = history
     .filter((m) => m.role === "user" || m.role === "assistant")
@@ -170,6 +231,12 @@ export async function runAgent(input: AgentRunInput): Promise<AgentRunResult> {
     ...(memoryBlock
       ? [{ role: "system" as const, content: memoryBlock }]
       : []),
+    ...(skillBlock
+      ? [{ role: "system" as const, content: skillBlock }]
+      : []),
+    ...(fileBlock
+      ? [{ role: "system" as const, content: fileBlock }]
+      : []),
     ...chatHistory,
     { role: "user", content: message },
   ];
@@ -179,6 +246,9 @@ export async function runAgent(input: AgentRunInput): Promise<AgentRunResult> {
   let finalText = "";
   let provider = "unknown";
   let fallbackFrom: string | undefined;
+  let promptTokens = 0;
+  let completionTokens = 0;
+  let lastModel = "";
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const allToolCalls: any[] = [];
 
@@ -188,6 +258,9 @@ export async function runAgent(input: AgentRunInput): Promise<AgentRunResult> {
       preferred,
     });
     provider = turn.provider;
+    lastModel = MODEL_REGISTRY.find((m) => m.id === turn.provider)?.model ?? turn.provider;
+    promptTokens += turn.promptTokens ?? 0;
+    completionTokens += turn.completionTokens ?? 0;
     if (turn.fallbackFrom && !fallbackFrom) {
       fallbackFrom = turn.fallbackFrom;
       events.push(
@@ -310,5 +383,8 @@ export async function runAgent(input: AgentRunInput): Promise<AgentRunResult> {
     artifact,
     provider,
     fallbackFrom,
+    promptTokens,
+    completionTokens,
+    model: lastModel,
   };
 }

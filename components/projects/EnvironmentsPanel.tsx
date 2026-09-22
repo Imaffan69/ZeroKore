@@ -13,10 +13,12 @@ import {
   Trash2,
   AlertTriangle,
   Download,
+  GitCompare,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { EASE, press } from "@/lib/motion";
 import FilesPanel, { type FileMeta } from "./FilesPanel";
+import ChangesTab from "./ChangesTab";
 import type { ProjectEnvironment, ProjectSecretSummary } from "@/types/projects";
 
 /**
@@ -30,11 +32,12 @@ import type { ProjectEnvironment, ProjectSecretSummary } from "@/types/projects"
  * (a hosted dev server) the panel says so instead of showing a fake one.
  */
 
-type Tab = "preview" | "files" | "terminal" | "dev_server" | "secrets";
+type Tab = "preview" | "files" | "changes" | "terminal" | "dev_server" | "secrets";
 
 const TABS: { id: Tab; label: string; icon: typeof Eye }[] = [
   { id: "preview", label: "Preview", icon: Eye },
-  { id: "files", label: "Files", icon: FileCode2 },
+  { id: "files", label: "Code", icon: FileCode2 },
+  { id: "changes", label: "Changes", icon: GitCompare },
   { id: "terminal", label: "Terminal", icon: TerminalSquare },
   { id: "dev_server", label: "Dev server", icon: Server },
   { id: "secrets", label: "Secrets", icon: KeyRound },
@@ -288,6 +291,13 @@ export default function EnvironmentsPanel({
       {tab === "files" && (
         <div className="flex min-h-0 flex-1 flex-col">
           <FilesPanel slug={slug} files={files} onChanged={onChanged} />
+        </div>
+      )}
+
+      {/* Changes */}
+      {tab === "changes" && (
+        <div className="flex min-h-0 flex-1 flex-col">
+          <ChangesTab slug={slug} />
         </div>
       )}
 

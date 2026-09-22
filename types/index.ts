@@ -8,6 +8,8 @@ export type ProviderPreference = ProviderName | "auto";
 export type AgentEventKind =
   | "agent_started"
   | "memory_retrieved"
+  | "files_context"
+  | "skill_loaded"
   | "tool_call"
   | "tool_completed"
   | "provider_fallback"

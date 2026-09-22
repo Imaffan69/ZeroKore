@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { checkAndIncrementUsage, refundUsage } from "@/lib/usage";
+import {
+  reserveCredits,
+  settleRun,
+  refundRun,
+  InsufficientCreditsError,
+} from "@/lib/credits";
+import { BASE_CREDIT_COST } from "@/lib/plans";
 import { runAgent } from "@/lib/ai/agent";
 import { applyArtifactToProject } from "@/lib/projects";
 import type { AgentMode, AgentResponseBody, ProviderPreference } from "@/types";
@@ -126,6 +133,26 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Credits: reserve the base cost up-front, settle with real token counts
+  // after the run, refund on failure. Admins/owners are exempt (unlimited).
+  let creditState;
+  try {
+    creditState = await reserveCredits(supabase, user.id, BASE_CREDIT_COST);
+  } catch (err) {
+    if (err instanceof InsufficientCreditsError) {
+      return NextResponse.json(
+        {
+          error:
+            "You are out of credits for today. They reset at midnight UTC — or upgrade your plan, earn credits via referrals and feedback, or verify as a student for +50/day.",
+          outOfCredits: true,
+          balance: err.available,
+        },
+        { status: 402 }
+      );
+    }
+    return NextResponse.json({ error: "Could not check credits. Please try again." }, { status: 500 });
+  }
+
   console.log(
     JSON.stringify({ event: "agent_started", user: user.id, mode, provider })
   );
@@ -158,6 +185,19 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Settle the run with real token counts (reserve → true cost, logged).
+    try {
+      await settleRun(supabase, user.id, result.promptTokens, result.completionTokens, {
+        conversationId: result.conversationId,
+        projectId,
+        provider: result.provider,
+        model: result.model,
+        reserved: creditState.unlimited ? 0 : BASE_CREDIT_COST,
+      });
+    } catch {
+      // settlement logging must never fail the response
+    }
+
     const response: AgentResponseBody = {
       reply: result.reply,
       conversationId: result.conversationId,
@@ -175,6 +215,11 @@ export async function POST(req: NextRequest) {
       err instanceof Error ? err.message : "Agent request failed.";
     // A failed call produced nothing, so it is not charged.
     const refunded = await refundUsage(supabase, user.id, usageCheck.usage);
+    try {
+      await refundRun(supabase, user.id, BASE_CREDIT_COST);
+    } catch {
+      // best-effort
+    }
     // Provider/config failures → 502; internal validation → 400/500.
     const status = /provider|configured|model/i.test(msg) ? 502 : 500;
     return NextResponse.json(

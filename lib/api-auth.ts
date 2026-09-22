@@ -24,10 +24,26 @@ export class MisconfiguredError extends Error {
   }
 }
 
+/** Thrown while maintenance mode is on; mapped to 503 by errorResponse(). */
+export class MaintenanceError extends Error {
+  constructor(message = "ZeroKore is briefly down for maintenance. Check back soon.") {
+    super(message);
+    this.name = "MaintenanceError";
+  }
+}
+
 export class BadRequestError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "BadRequestError";
+  }
+}
+
+/** Thrown when a role requirement is not met; mapped to 403 by errorResponse(). */
+export class ForbiddenError extends Error {
+  constructor(message = "Not authorized.") {
+    super(message);
+    this.name = "ForbiddenError";
   }
 }
 
@@ -48,6 +64,22 @@ export async function requireUser(): Promise<AuthContext> {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) throw new UnauthorizedError();
+
+  // Maintenance gate: staff (support and above) pass through.
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role, suspended")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (profile?.suspended) {
+    throw new ForbiddenError("This account is suspended.");
+  }
+  if (profile?.role !== "admin" && profile?.role !== "owner" && profile?.role !== "moderator" && profile?.role !== "support") {
+    const { getMaintenanceFlag } = await import("@/lib/flags");
+    const flag = await getMaintenanceFlag(supabase);
+    if (flag.enabled) throw new MaintenanceError(flag.message || undefined);
+  }
+
   return { supabase, user };
 }
 
@@ -58,6 +90,12 @@ export function errorResponse(err: unknown): NextResponse {
   }
   if (err instanceof BadRequestError) {
     return NextResponse.json({ error: err.message }, { status: 400 });
+  }
+  if (err instanceof ForbiddenError) {
+    return NextResponse.json({ error: err.message }, { status: 403 });
+  }
+  if (err instanceof MaintenanceError) {
+    return NextResponse.json({ error: err.message, maintenance: true }, { status: 503 });
   }
   if (err instanceof MisconfiguredError) {
     return NextResponse.json({ error: err.message }, { status: 500 });

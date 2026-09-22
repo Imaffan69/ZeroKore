@@ -21,6 +21,8 @@ import {
   Zap,
 } from "lucide-react";
 import ParticleField from "@/components/visual/ParticleField";
+import SavingsCalculator from "@/components/landing/SavingsCalculator";
+import CreditsPerDay from "@/components/landing/CreditsPerDay";
 import { EASE } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
@@ -195,7 +197,7 @@ const HERO_MARQUEE = [
   "Keep the memory",
 ];
 
-function Hero() {
+function Hero({ totalUsers }: { totalUsers: number | null }) {
   return (
     <section className="kore-hero kore-noise">
       {/* Live particle field, behind everything and never interactive. */}
@@ -274,9 +276,17 @@ function Hero() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.7, ease: EASE, delay: 0.26 }}
-          className="mt-5 font-mono text-[11px] text-kore-muted"
+          className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-[11px] text-kore-muted"
         >
-          No credit card · Your projects live at zerokore.vercel.app/&lt;you&gt;/&lt;project&gt;
+          {totalUsers !== null && totalUsers > 0 && (
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" aria-hidden />
+              Join {totalUsers.toLocaleString()} builders already on ZeroKore
+            </span>
+          )}
+          <span>
+            No credit card · Your projects live at zerokore.vercel.app/&lt;you&gt;/&lt;project&gt;
+          </span>
         </motion.p>
       </div>
 
@@ -731,18 +741,20 @@ function Footer() {
 
 /* ------------------------------------------------------------ composition */
 
-export default function LandingPage() {
+export default function LandingPage({ totalUsers }: { totalUsers: number | null }) {
   return (
     <div className="relative min-h-screen overflow-x-clip bg-black text-white">
       <ParticleField />
       <div className="relative z-10">
         <Nav />
         <main>
-          <Hero />
+          <Hero totalUsers={totalUsers} />
           <Marquee />
           <Engine />
           <Process />
           <Agentic />
+          <SavingsCalculator />
+          <CreditsPerDay />
           <Pricing />
           <Cta />
         </main>
