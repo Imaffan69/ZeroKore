@@ -83,6 +83,9 @@ export default function ProjectWorkspace({
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [panel, setPanel] = useState<"chat" | "environment" | "terminal">("chat");
 
+  const [credits, setCredits] = useState<{ balance: number; daily: number; plan: string } | null>(null);
+  const [skills, setSkills] = useState<{ name: string; description: string }[] | null>(null);
+
   const [pushing, setPushing] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -124,8 +127,35 @@ export default function ProjectWorkspace({
       } catch {
         // The picker stays empty; the cascade still works without it.
       }
+      try {
+        const res = await fetch("/api/account/credits");
+        if (res.ok) {
+          const data = await res.json();
+          setCredits({
+            balance: data.balance ?? 0,
+            daily: data.daily ?? 0,
+            plan: data.plan ?? "free",
+          });
+        }
+      } catch {
+        // Credit meter hides; enforcement still happens server-side.
+      }
+      try {
+        const res = await fetch("/api/skills");
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.skills)) setSkills(data.skills);
+        }
+      } catch {
+        // /-autocomplete hides; /skill-name still resolves server-side.
+      }
     })();
   }, []);
+
+  const creditLine =
+    credits !== null
+      ? `${credits.balance}/${credits.daily} credits left · ${credits.plan}`
+      : null;
 
   /* -------------------------------------------------------------- agent */
 
@@ -436,6 +466,7 @@ export default function ProjectWorkspace({
             onStop={stop}
             onNew={newTask}
             loading={loading}
+            creditLine={creditLine}
             limitReached={limitReached}
             mode={mode}
             onModeChange={setMode}
@@ -446,6 +477,8 @@ export default function ProjectWorkspace({
               configured: m.configured,
             }))}
             onModelChange={setModel}
+            filesForMention={files.map((f) => ({ path: f.path }))}
+            skillsForSlash={skills}
           />
         </section>
 
