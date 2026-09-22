@@ -68,9 +68,17 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 
 /* ------------------------------------------------------------------- nav */
 
+const PRODUCTS = [
+  { href: "/#engine", label: "Web", note: "Build apps in the browser" },
+  { href: "/#engine", label: "Cloud", note: "Import any GitHub repo" },
+  { href: "/#agentic", label: "Chat", note: "Talk to the agent" },
+  { href: "/#engine", label: "Terminal", note: "Real commands, real files" },
+] as const;
+
 function Nav() {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
+  const [productsOpen, setProductsOpen] = useState(false);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24);
@@ -80,10 +88,9 @@ function Nav() {
   }, []);
 
   const links = [
-    { href: "#engine", label: "Features" },
-    { href: "#process", label: "How it works" },
-    { href: "#agentic", label: "The agent" },
-    { href: "#pricing", label: "Pricing" },
+    { href: "/pricing", label: "Pricing" },
+    { href: "/earn", label: "Earn" },
+    { href: "/blog", label: "Blog" },
   ];
 
   return (
@@ -103,15 +110,58 @@ function Nav() {
           </span>
         </Link>
 
-        <nav className="hidden items-center gap-1 md:flex">
+        <nav aria-label="Primary" className="hidden items-center gap-1 md:flex">
+          <div
+            className="relative"
+            onMouseEnter={() => setProductsOpen(true)}
+            onMouseLeave={() => setProductsOpen(false)}
+          >
+            <button
+              type="button"
+              aria-expanded={productsOpen}
+              aria-haspopup="true"
+              onClick={() => setProductsOpen((v) => !v)}
+              onFocus={() => setProductsOpen(true)}
+              className="flex items-center gap-1 rounded-full px-3.5 py-2 text-sm text-kore-muted transition-colors duration-150 hover:text-white"
+            >
+              Products
+              <ChevronDown
+                className={cn("h-3.5 w-3.5 transition-transform", productsOpen && "rotate-180")}
+                aria-hidden
+              />
+            </button>
+            <AnimatePresence>
+              {productsOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 6 }}
+                  transition={{ duration: 0.16, ease: EASE }}
+                  className="glass glass-sheen absolute left-0 top-full z-50 mt-1 w-64 rounded-2xl p-2"
+                >
+                  {PRODUCTS.map((p) => (
+                    <Link
+                      key={p.label}
+                      href={p.href}
+                      onClick={() => setProductsOpen(false)}
+                      className="block rounded-xl px-3.5 py-2.5 transition-colors hover:bg-white/8"
+                    >
+                      <span className="block text-sm font-medium text-white">{p.label}</span>
+                      <span className="mt-0.5 block text-xs text-kore-muted">{p.note}</span>
+                    </Link>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
           {links.map((l) => (
-            <a
+            <Link
               key={l.href}
               href={l.href}
               className="rounded-full px-3.5 py-2 text-sm text-kore-muted transition-colors duration-150 hover:text-white"
             >
               {l.label}
-            </a>
+            </Link>
           ))}
         </nav>
 
@@ -154,15 +204,29 @@ function Nav() {
             className="glass-bar overflow-hidden md:hidden"
           >
             <div className="kore-shell flex flex-col gap-1 py-3">
+              <p className="px-3 pb-1 pt-1 font-mono text-[10px] tracking-[0.24em] text-kore-faint">
+                PRODUCTS
+              </p>
+              {PRODUCTS.map((p) => (
+                <Link
+                  key={p.label}
+                  href={p.href}
+                  onClick={() => setOpen(false)}
+                  className="rounded-xl px-3 py-2.5 text-sm text-kore-text"
+                >
+                  {p.label}
+                  <span className="mt-0.5 block text-xs text-kore-muted">{p.note}</span>
+                </Link>
+              ))}
               {links.map((l) => (
-                <a
+                <Link
                   key={l.href}
                   href={l.href}
                   onClick={() => setOpen(false)}
                   className="rounded-xl px-3 py-2.5 text-sm text-kore-text"
                 >
                   {l.label}
-                </a>
+                </Link>
               ))}
               <div className="mt-2 flex gap-2">
                 <Link
@@ -270,6 +334,44 @@ function Hero({ totalUsers }: { totalUsers: number | null }) {
           >
             See what it does
           </a>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 28 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, ease: EASE, delay: 0.3 }}
+          className="mt-12 hidden max-w-3xl lg:block"
+        >
+          <div className="glass overflow-hidden rounded-2xl text-left shadow-2xl shadow-black/50">
+            <div className="flex items-center gap-1.5 border-b border-white/8 px-4 py-3">
+              <span className="h-2.5 w-2.5 rounded-full bg-[#ff5f57]" aria-hidden />
+              <span className="h-2.5 w-2.5 rounded-full bg-[#febc2e]" aria-hidden />
+              <span className="h-2.5 w-2.5 rounded-full bg-[#28c840]" aria-hidden />
+              <span className="ml-3 hidden gap-1.5 sm:flex" role="tablist" aria-label="Workspace preview">
+                {["Preview", "Code", "Terminal", "Changes"].map((t, i) => (
+                  <span
+                    key={t}
+                    role="tab"
+                    aria-selected={i === 0}
+                    className={cn(
+                      "rounded-full px-3 py-1 text-[11px]",
+                      i === 0 ? "bg-white/12 text-white" : "text-kore-muted"
+                    )}
+                  >
+                    {t}
+                  </span>
+                ))}
+              </span>
+            </div>
+            <div className="space-y-1.5 px-5 py-4 font-mono text-[12px] leading-relaxed">
+              <p className="text-kore-muted">
+                <span className="text-emerald-400">$</span> agent &quot;add a pricing section&quot;
+              </p>
+              <p className="text-kore-text">Read 6 files · mapped components/pricing</p>
+              <p className="text-emerald-300">Edit pricing.tsx +48 −6 · saved</p>
+              <p className="text-kore-text">Preview updated · pushed to main · 4f2a1de</p>
+            </div>
+          </div>
         </motion.div>
 
         <motion.p
@@ -724,10 +826,13 @@ function Footer() {
             ZEROKORE
           </span>
         </div>
-        <nav className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-kore-muted">
+        <nav aria-label="Footer" className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-kore-muted">
           <Link href="/#engine" className="transition-colors hover:text-white">Engine</Link>
           <Link href="/#agentic" className="transition-colors hover:text-white">Agent</Link>
-          <Link href="/#pricing" className="transition-colors hover:text-white">Pricing</Link>
+          <Link href="/pricing" className="transition-colors hover:text-white">Pricing</Link>
+          <Link href="/earn" className="transition-colors hover:text-white">Earn</Link>
+          <Link href="/students" className="transition-colors hover:text-white">Students</Link>
+          <Link href="/blog" className="transition-colors hover:text-white">Blog</Link>
           <Link href="/privacy" className="transition-colors hover:text-white">Privacy</Link>
           <Link href="/terms" className="transition-colors hover:text-white">Terms</Link>
         </nav>
