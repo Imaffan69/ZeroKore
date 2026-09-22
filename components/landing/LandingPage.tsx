@@ -844,6 +844,151 @@ function Footer() {
   );
 }
 
+const REPLACES: { product: string; tools: string[] }[] = [
+  {
+    product: "Web",
+    tools: ["Bolt", "Lovable", "v0", "Replit Agent"],
+  },
+  {
+    product: "Cloud",
+    tools: ["Cursor Cloud", "Devin", "Factory", "Claude Code"],
+  },
+  {
+    product: "Chat",
+    tools: ["Copilot Pro", "ChatGPT Plus", "Perplexity Pro", "Gemini Advanced"],
+  },
+  {
+    product: "Terminal",
+    tools: ["OpenCode", "Codex CLI", "Claude Code", "Aider"],
+  },
+] as const;
+
+function Replaces() {
+  return (
+    <section aria-label="Tools ZeroKore replaces" className="kore-section relative">
+      <div className="kore-shell">
+        <Reveal className="max-w-2xl">
+          <SectionLabel>WHY FREE</SectionLabel>
+          <h2 className="mt-4 text-[clamp(1.9rem,4.2vw,3.1rem)] font-semibold leading-[1.08] tracking-[-0.03em] text-white">
+            Replaces the stack you already pay for.
+          </h2>
+          <p className="mt-4 text-base leading-relaxed text-kore-muted">
+            One workspace instead of four subscriptions. Each surface of
+            ZeroKore stands in for a paid tool — and stays free while we grow.
+          </p>
+        </Reveal>
+
+        <div className="mt-14 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {REPLACES.map((r, i) => (
+            <Reveal key={r.product} delay={i * 0.06}>
+              <div className="glass glass-sheen h-full rounded-2xl p-5">
+                <p className="font-mono text-[10px] tracking-[0.24em] text-kore-muted">
+                  ZEROKORE {r.product.toUpperCase()}
+                </p>
+                <p className="mt-3 text-sm font-semibold text-white">Replaces</p>
+                <ul className="mt-3 space-y-2">
+                  {r.tools.map((t) => (
+                    <li key={t} className="flex items-center gap-2 text-sm text-kore-muted">
+                      <span className="h-1 w-1 rounded-full bg-white/25" aria-hidden />
+                      {t}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </Reveal>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function BlogTeaser() {
+  const posts = [
+    {
+      category: "ANNOUNCEMENTS",
+      title: "ZeroKore is free: 30 credits every day, every model",
+      excerpt: "No trial, no card. One request plus a small per-token meter, reset at midnight UTC.",
+      href: "/blog",
+    },
+    {
+      category: "ENGINEERING",
+      title: "How the agent edits your files: versions, diffs, Changes",
+      excerpt: "Every edit snapshots the previous content, so the Changes tab shows a true +/− diff.",
+      href: "/blog",
+    },
+    {
+      category: "COMPARISONS",
+      title: "ZeroKore vs Copilot Pro vs Cursor: what $0 gets you",
+      excerpt: "Agent autonomy, file editing, workspaces and price — side by side.",
+      href: "/blog",
+    },
+  ];
+  return (
+    <section aria-label="From the blog" className="kore-section relative">
+      <div className="kore-shell">
+        <Reveal className="flex flex-wrap items-end justify-between gap-4">
+          <div className="max-w-xl">
+            <SectionLabel>FROM THE BLOG</SectionLabel>
+            <h2 className="mt-4 text-[clamp(1.9rem,4.2vw,3.1rem)] font-semibold leading-[1.08] tracking-[-0.03em] text-white">
+              Notes from the build.
+            </h2>
+          </div>
+          <Link
+            href="/blog"
+            className="glass-subtle inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm text-kore-text transition-colors hover:bg-white/10"
+          >
+            View all posts
+            <ArrowRight className="h-4 w-4" aria-hidden />
+          </Link>
+        </Reveal>
+
+        <div className="mt-14 grid gap-3 md:grid-cols-3">
+          {posts.map((p, i) => (
+            <Reveal key={p.title} delay={i * 0.06}>
+              <Link
+                href={p.href}
+                className="glass glass-sheen glass-interactive block h-full rounded-2xl p-5"
+              >
+                <span className="rounded-full bg-white/8 px-2.5 py-1 font-mono text-[10px] tracking-[0.14em] text-kore-muted">
+                  {p.category}
+                </span>
+                <h3 className="mt-4 text-[0.95rem] font-semibold leading-snug text-white">
+                  {p.title}
+                </h3>
+                <p className="mt-2 text-sm leading-relaxed text-kore-muted">{p.excerpt}</p>
+              </Link>
+            </Reveal>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function VersionBlock() {
+  return (
+    <section aria-label="Current version" className="relative pb-4">
+      <div className="kore-shell">
+        <Reveal>
+          <div className="glass flex flex-col items-start justify-between gap-3 rounded-2xl px-5 py-4 sm:flex-row sm:items-center">
+            <p className="font-mono text-[11px] tracking-[0.14em] text-kore-muted">
+              ZEROKORE <span className="text-white">v1.4</span> · CREDITS ENGINE LIVE
+            </p>
+            <Link
+              href="/blog"
+              className="inline-flex items-center gap-1.5 text-xs text-kore-muted transition-colors hover:text-white"
+            >
+              Read the changelog
+              <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+            </Link>
+          </div>
+        </Reveal>
+      </div>
+    </section>
+  );
+}
+
 /* ------------------------------------------------------------ composition */
 
 export default function LandingPage({ totalUsers }: { totalUsers: number | null }) {
@@ -856,11 +1001,14 @@ export default function LandingPage({ totalUsers }: { totalUsers: number | null 
           <Hero totalUsers={totalUsers} />
           <Marquee />
           <Engine />
+          <Replaces />
           <Process />
           <Agentic />
           <SavingsCalculator />
           <CreditsPerDay />
           <Pricing />
+          <BlogTeaser />
+          <VersionBlock />
           <Cta />
         </main>
         <Footer />

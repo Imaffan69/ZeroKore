@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-const CATEGORIES = ["All", "Announcements", "Comparisons", "Guides", "Engineering"] as const;
+/** Category filter tabs: All + the four real content categories. */
 
 /** Seed posts ship with the page; admin announcements come from the DB. */
 const SEED_POSTS: {
@@ -91,6 +91,23 @@ export default async function BlogPage() {
       <h1 className="mt-3 text-4xl font-semibold tracking-[-0.03em] text-white sm:text-5xl">
         Notes from the build.
       </h1>
+
+      <div className="mt-8 flex flex-wrap gap-2" role="tablist" aria-label="Categories">
+        {["All", "Announcements", "Comparisons", "Guides", "Engineering"].map((c) => (
+          <span
+            key={c}
+            role="tab"
+            aria-selected={c === "All"}
+            className={
+              c === "All"
+                ? "rounded-full bg-white px-3.5 py-1.5 font-mono text-[10px] tracking-[0.14em] text-black"
+                : "rounded-full border border-white/10 px-3.5 py-1.5 font-mono text-[10px] tracking-[0.14em] text-kore-muted"
+            }
+          >
+            {c.toUpperCase()}
+          </span>
+        ))}
+      </div>
 
       <div className="mt-10 space-y-4">
         {announcements.map((a) => (
