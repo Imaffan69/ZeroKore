@@ -3,6 +3,22 @@ import { redirect } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 
+/** Returns the current user (or null) without redirecting.
+ * Use this for hidden/role-gated routes where an anonymous visitor should see
+ * an ordinary 404 rather than a login redirect. */
+export async function getSession(): Promise<User | null> {
+  await cookies();
+  let user: User | null = null;
+  try {
+    const supabase = await createClient();
+    const { data } = await supabase.auth.getUser();
+    user = data.user;
+  } catch {
+    user = null;
+  }
+  return user;
+}
+
 /**
  * The auth gate shared by every signed-in area (`/dashboard`, `/projects`).
  *

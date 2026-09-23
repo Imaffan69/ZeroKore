@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Sparkles, ArrowLeft, FileText, Terminal } from "lucide-react";
 import { listSkills, getSkill } from "@/lib/skills";
 import { renderSafeMarkdown } from "@/lib/markdown";
-import { requireSession } from "@/lib/require-session";
+import { getSession } from "@/lib/require-session";
 
 export const metadata: Metadata = {
   title: "Skills — ZeroKore",
@@ -22,8 +22,7 @@ export const dynamic = "force-dynamic";
  * inject markup. Gated behind a session like the skills API.
  */
 export default async function SkillsPage() {
-  await requireSession("/skills");
-
+  const session = await getSession();
   const summaries = await listSkills();
   const details = await Promise.all(summaries.map((s) => getSkill(s.name)));
 
@@ -37,6 +36,22 @@ export default async function SkillsPage() {
           <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
           Back to workspace
         </Link>
+
+        {session && (
+          <div className="mt-6 rounded-xl border border-white/10 bg-white/[0.03] p-3 text-sm">
+            <span className="font-mono text-[10px] tracking-wide text-kore-faint">
+              SIGNED IN
+            </span>
+            <p className="mt-1 font-medium text-white break-all">{session.email}</p>
+            <Link
+              href="/dashboard"
+              className="mt-2 inline-flex items-center gap-1 text-kore-accent hover:underline"
+            >
+              Open workspace
+              <ArrowLeft className="h-3 w-3 rotate-180" aria-hidden />
+            </Link>
+          </div>
+        )}
 
         <header className="mt-6">
           <p className="font-mono text-[10px] tracking-[0.24em] text-kore-muted">

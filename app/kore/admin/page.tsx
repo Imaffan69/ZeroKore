@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { requireSession } from "@/lib/require-session";
+import { getSession } from "@/lib/require-session";
 import { createClient } from "@/lib/supabase/server";
 import { getRbac } from "@/lib/rbac";
 import AdminPanel from "@/components/admin/AdminPanel";
@@ -17,10 +17,14 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function KoreAdminPage() {
-  const user = await requireSession("/kore/admin");
+  // Check auth first, without redirecting — anonymous visitors get an
+  // ordinary 404 so the panel's existence is never revealed.
+  const user = await getSession();
+  if (!user) notFound();
+
   const supabase = await createClient();
   const rbac = await getRbac(supabase, user.id, user.email);
-  // Sub-staff ranks get an ordinary 404 — the panel's existence is not revealed.
+  // Logged-in users below staff rank also get an ordinary 404.
   if (!rbac.isStaff) notFound();
 
   return <AdminPanel role={rbac.role} isOwner={rbac.isOwner} />;
