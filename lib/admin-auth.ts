@@ -1,13 +1,11 @@
 import { cookies } from "next/headers";
 import { createHash } from "crypto";
+import { createClient } from "@/lib/supabase/server";
 
 const COOKIE_NAME = "zk_admin_session";
 const SALT = "zerokore-admin-v1"; // static salt for password hashing
 
-/**
- * Hash a password for storage in an environment variable.
- * Run once locally:  node -e "require('./lib/admin-auth').hashPassword('YOUR_PASSWORD')"
- */
+/** Hash a password for storage. */
 export function hashPassword(password: string): string {
   return createHash("sha256").update(SALT + password).digest("hex");
 }
@@ -17,19 +15,57 @@ export function verifyPassword(password: string, hash: string): boolean {
   return hashPassword(password) === hash;
 }
 
-/** Read the admin username from environment. */
-export function getAdminUsername(): string {
+/** Read the admin username from the database (Supabase). */
+export async function adminUsernameFromDb(): Promise<string> {
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("admin_credentials")
+      .select("username")
+      .single();
+    if (error || !data?.username) return "";
+    return data.username.trim();
+  } catch {
+    return "";
+  }
+}
+
+/** Read the admin password hash from the database (Supabase). */
+export async function adminPasswordHashFromDb(): Promise<string> {
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("admin_credentials")
+      .select("password_hash")
+      .single();
+    if (error || !data?.password_hash) return "";
+    return data.password_hash;
+  } catch {
+    return "";
+  }
+}
+
+/** Read the admin username from environment (fallback). */
+export function adminUsernameFromEnv(): string {
   return process.env.ADMIN_USERNAME?.trim() || "";
 }
 
-/** Read the admin password hash from environment. */
-export function getAdminPasswordHash(): string {
+/** Read the admin password hash from environment (fallback). */
+export function adminPasswordHashFromEnv(): string {
   return process.env.ADMIN_PASSWORD_HASH || "";
 }
 
-/** Check whether admin auth is configured. */
-export function isAdminConfigured(): boolean {
-  return Boolean(getAdminUsername()) && Boolean(getAdminPasswordHash());
+/** Check whether admin auth is configured (DB first, then env). */
+export async function isAdminConfigured(): Promise<boolean> {
+  const dbUser = await adminUsernameFromDb();
+  const dbHash = await adminPasswordHashFromDb();
+  if (dbUser && dbHash) return true;
+  return Boolean(adminUsernameFromEnv()) && Boolean(adminPasswordHashFromEnv());
+}
+
+/** Get the admin secret (from env or a generated fallback). */
+function getAdminSecret(): string {
+  return process.env.ADMIN_SECRET || "zerokore-admin-secret-change-me";
 }
 
 /** Read the admin session cookie. */
@@ -43,9 +79,9 @@ export async function getAdminSession(): Promise<{
   try {
     const payload = JSON.parse(Buffer.from(value, "base64").toString("utf8"));
     if (!payload.username || !payload.signed) return { username: "", authenticated: false };
-    // Verify the cookie payload is valid (signed with a server secret)
+    // Verify the cookie payload is signed with a server secret
     const expected = createHash("sha256")
-      .update(SALT + payload.username + (process.env.ADMIN_SECRET || ""))
+      .update(SALT + payload.username + getAdminSecret())
       .digest("hex")
       .slice(0, 16);
     if (payload.signature !== expected) return { username: "", authenticated: false };
@@ -57,7 +93,7 @@ export async function getAdminSession(): Promise<{
 
 /** Set the admin session cookie. */
 export async function setAdminSession(username: string): Promise<void> {
-  const secret = process.env.ADMIN_SECRET || "zerokore-admin-secret-change-me";
+  const secret = getAdminSecret();
   const payload = { username, signed: true };
   const signature = createHash("sha256")
     .update(SALT + payload.username + secret)
@@ -80,9 +116,25 @@ export async function clearAdminSession(): Promise<void> {
   cookieStore.delete(COOKIE_NAME);
 }
 
+/** Set or update the admin credentials in the database.
+ *  Creates the row if it doesn't exist, updates if it does.
+ *  Only callable from a trusted API (RLS or service role). */
+export async function setAdminCredentials(username: string, passwordHash: string): Promise<boolean> {
+  try {
+    const supabase = await createClient();
+    const { error } = await supabase
+      .from("admin_credentials")
+      .upsert({ username: username.trim(), password_hash: passwordHash });
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
 /** Return the username to show in the admin panel header, or null if not authenticated. */
 export async function getAdminIdentity(): Promise<string | null> {
   const session = await getAdminSession();
   if (!session.authenticated) return null;
   return session.username;
 }
+

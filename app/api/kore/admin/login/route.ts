@@ -1,8 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyPassword, setAdminSession, getAdminUsername, getAdminPasswordHash } from "@/lib/admin-auth";
+import { verifyPassword, setAdminSession, adminUsernameFromDb, adminPasswordHashFromDb, adminUsernameFromEnv, adminPasswordHashFromEnv } from "@/lib/admin-auth";
 
 export async function POST(req: NextRequest) {
-  if (!getAdminUsername() || !getAdminPasswordHash()) {
+  const dbUsername = await adminUsernameFromDb();
+  const dbHash = await adminPasswordHashFromDb();
+  const envUsername = adminUsernameFromEnv();
+  const envHash = adminPasswordHashFromEnv();
+
+  const configuredUsername = dbUsername || envUsername;
+  const configuredHash = dbHash || envHash;
+
+  if (!configuredUsername || !configuredHash) {
     return NextResponse.json({ error: "Admin auth not configured." }, { status: 503 });
   }
 
@@ -21,11 +29,11 @@ export async function POST(req: NextRequest) {
 
   const normalizedUsername = username.trim();
 
-  if (normalizedUsername !== getAdminUsername()) {
+  if (normalizedUsername !== configuredUsername) {
     return NextResponse.json({ error: "Invalid username or password." }, { status: 401 });
   }
 
-  if (!verifyPassword(password, getAdminPasswordHash())) {
+  if (!verifyPassword(password, configuredHash)) {
     return NextResponse.json({ error: "Invalid username or password." }, { status: 401 });
   }
 

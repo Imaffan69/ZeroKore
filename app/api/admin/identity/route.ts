@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   // Admin password session
-  if (isAdminConfigured()) {
+  if (await isAdminConfigured()) {
     const identity = await getAdminIdentity();
     if (identity) {
       return NextResponse.json({ username: identity, source: "admin-password" });

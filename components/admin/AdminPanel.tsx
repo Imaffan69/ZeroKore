@@ -9,6 +9,7 @@ import AdminFeedback from "@/components/admin/AdminFeedback";
 import AdminAnnouncements from "@/components/admin/AdminAnnouncements";
 import AdminControl from "@/components/admin/AdminControl";
 import AdminSecurity from "@/components/admin/AdminSecurity";
+import AdminLoginForm from "@/components/admin/AdminLoginForm";
 
 type Tab = "overview" | "users" | "security" | "feedback" | "announcements" | "control";
 
@@ -43,20 +44,19 @@ const RANK: Record<string, number> = {
   owner: 5,
 };
 
-export default function AdminPanel({ role, isOwner, adminAuth }: { role: string; isOwner: boolean; adminAuth?: boolean }) {
+export default function AdminPanel({ role, isOwner, adminAuth, showLogin, adminUsername }: { role: string; isOwner: boolean; adminAuth?: boolean; showLogin?: boolean; adminUsername?: string }) {
   const effectiveRole = adminAuth ? "admin" : role;
   const rank = RANK[effectiveRole] ?? 0;
   const allowed = TABS.filter((t) => rank >= (RANK[t.min] ?? 99));
   const [tab, setTab] = useState<Tab>(allowed[0]?.id ?? "overview");
   const activeTab = allowed.some((t) => t.id === tab) ? tab : (allowed[0]?.id ?? "overview");
 
-  // Load the admin password username for display
-  const [adminUsername, setAdminUsername] = useState<string | null>(null);
+  const [adminUsernameState, setAdminUsernameState] = useState<string | null>(null);
   useEffect(() => {
     if (!adminAuth) return;
     fetch("/api/admin/identity")
       .then((r) => r.json())
-      .then((d) => setAdminUsername(d.username || null))
+      .then((d) => setAdminUsernameState(d.username || null))
       .catch(() => {});
   }, [adminAuth]);
 
@@ -66,6 +66,19 @@ export default function AdminPanel({ role, isOwner, adminAuth }: { role: string;
       window.location.href = "/kore/admin/login";
     });
   }, []);
+
+  // When admin password auth is configured but user isn't logged in yet,
+  // show only the login form — no header, no nav, no tabs.
+  if (adminAuth && showLogin) {
+    return (
+      <div className="min-h-screen bg-black px-5 py-16">
+        <div className="mx-auto max-w-md">
+          <AdminLoginForm />
+        </div>
+      </div>
+    );
+  }
+
 
   return (
     <div className="min-h-screen bg-black text-kore-text">
@@ -78,8 +91,7 @@ export default function AdminPanel({ role, isOwner, adminAuth }: { role: string;
             <p className="text-xs text-kore-muted">
               {adminAuth ? (
                 <>
-                  Admin password user{" "}
-                  <span className="text-kore-accent">{adminUsername || "…"}</span>
+                  Admin: <span className="text-kore-accent">{adminUsernameState || adminUsername}</span>
                   {" · "}
                   <span className="text-kore-faint">signed in via password</span>
                 </>

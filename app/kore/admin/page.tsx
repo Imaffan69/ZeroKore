@@ -25,8 +25,14 @@ export const dynamic = "force-dynamic";
 export default async function KoreAdminPage() {
   // Admin password session takes precedence if configured
   const adminSession = await getAdminSession();
-  if (isAdminConfigured() && adminSession.authenticated) {
-    return <AdminPanel role="admin" isOwner={false} adminAuth />;
+  if (adminSession.authenticated) {
+    return <AdminPanel role="admin" isOwner={false} adminAuth adminUsername={adminSession.username} />;
+  }
+
+  // If DB or env admin credentials are configured, show the login page
+  const dbConfigured = await isAdminConfigured();
+  if (dbConfigured) {
+    return <AdminPanel role="admin" isOwner={false} adminAuth showLogin />;
   }
 
   // Otherwise fall back to Supabase staff auth
