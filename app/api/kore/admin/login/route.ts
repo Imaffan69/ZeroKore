@@ -21,7 +21,6 @@ export async function POST(req: NextRequest) {
 
   const normalizedUsername = username.trim();
 
-  // Check against the configured admin credentials
   if (normalizedUsername !== getAdminUsername()) {
     return NextResponse.json({ error: "Invalid username or password." }, { status: 401 });
   }
@@ -30,7 +29,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid username or password." }, { status: 401 });
   }
 
-  // Success — set the session cookie and let the client redirect
   await setAdminSession(normalizedUsername);
   return NextResponse.json({ ok: true });
 }

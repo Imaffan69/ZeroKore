@@ -23,7 +23,7 @@ export default function AdminLoginForm() {
 
     setLoading(true);
     try {
-      const res = await fetch("/kore/admin/login", {
+      const res = await fetch("/api/kore/admin/login", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ username: username.trim(), password }),
