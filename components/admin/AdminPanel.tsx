@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { BarChart3, Users, MessageSquare, Megaphone, ShieldAlert, Globe } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { BarChart3, Users, MessageSquare, Megaphone, ShieldAlert, Globe, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import AdminOverview from "@/components/admin/AdminOverview";
 import AdminUsers from "@/components/admin/AdminUsers";
@@ -16,6 +16,9 @@ type Tab = "overview" | "users" | "security" | "feedback" | "announcements" | "c
  * Each tab declares the minimum staff rank that may open it. The matching API
  * route enforces the same threshold server-side, so the client list is a
  * usability filter and never the security boundary.
+ *
+ * When accessed via admin password auth (ADMIN_USERNAME + ADMIN_PASSWORD_HASH),
+ * the panel treats the user as "admin" rank for all tabs.
  */
 const TABS: {
   id: Tab;
@@ -40,11 +43,29 @@ const RANK: Record<string, number> = {
   owner: 5,
 };
 
-export default function AdminPanel({ role, isOwner }: { role: string; isOwner: boolean }) {
-  const rank = RANK[role] ?? 0;
+export default function AdminPanel({ role, isOwner, adminAuth }: { role: string; isOwner: boolean; adminAuth?: boolean }) {
+  const effectiveRole = adminAuth ? "admin" : role;
+  const rank = RANK[effectiveRole] ?? 0;
   const allowed = TABS.filter((t) => rank >= (RANK[t.min] ?? 99));
   const [tab, setTab] = useState<Tab>(allowed[0]?.id ?? "overview");
   const activeTab = allowed.some((t) => t.id === tab) ? tab : (allowed[0]?.id ?? "overview");
+
+  // Load the admin password username for display
+  const [adminUsername, setAdminUsername] = useState<string | null>(null);
+  useEffect(() => {
+    if (!adminAuth) return;
+    fetch("/api/admin/identity")
+      .then((r) => r.json())
+      .then((d) => setAdminUsername(d.username || null))
+      .catch(() => {});
+  }, [adminAuth]);
+
+  // Logout handler for admin password session
+  const handleLogout = useCallback(() => {
+    fetch("/kore/admin/logout", { method: "POST" }).then(() => {
+      window.location.href = "/kore/admin/login";
+    });
+  }, []);
 
   return (
     <div className="min-h-screen bg-black text-kore-text">
@@ -55,13 +76,36 @@ export default function AdminPanel({ role, isOwner }: { role: string; isOwner: b
               ZeroKore <span className="text-kore-accent">control</span>
             </h1>
             <p className="text-xs text-kore-muted">
-              Signed in as <span className="text-kore-accent">{role}</span>
-              {isOwner ? " · full authority" : ""}
+              {adminAuth ? (
+                <>
+                  Admin password user{" "}
+                  <span className="text-kore-accent">{adminUsername || "…"}</span>
+                  {" · "}
+                  <span className="text-kore-faint">signed in via password</span>
+                </>
+              ) : (
+                <>
+                  Signed in as{" "}
+                  <span className="text-kore-accent">{effectiveRole}</span>
+                  {isOwner ? " · full authority" : ""}
+                </>
+              )}
             </p>
           </div>
-          <span className="rounded-full border border-white/10 px-3 py-1 text-xs text-kore-muted">
-            unlisted · do not share
-          </span>
+          <div className="flex items-center gap-2">
+            {adminAuth && (
+              <button
+                onClick={handleLogout}
+                className="inline-flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1 text-xs text-kore-muted transition hover:bg-white/5 hover:text-white"
+              >
+                <LogOut className="h-3 w-3" aria-hidden />
+                Sign out
+              </button>
+            )}
+            <span className="rounded-full border border-white/10 px-3 py-1 text-xs text-kore-muted">
+              unlisted · do not share
+            </span>
+          </div>
         </div>
       </header>
 
@@ -85,7 +129,7 @@ export default function AdminPanel({ role, isOwner }: { role: string; isOwner: b
 
       <main className="mx-auto max-w-6xl px-5 pb-16">
         {activeTab === "overview" && <AdminOverview />}
-        {activeTab === "users" && <AdminUsers isOwner={isOwner} selfRole={role} />}
+        {activeTab === "users" && <AdminUsers isOwner={isOwner} selfRole={effectiveRole} />}
         {activeTab === "security" && <AdminSecurity />}
         {activeTab === "feedback" && <AdminFeedback />}
         {activeTab === "announcements" && <AdminAnnouncements />}
