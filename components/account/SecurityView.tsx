@@ -165,6 +165,36 @@ export default function SecurityView() {
         {error && <p className="mt-2 text-xs text-red-400">{error}</p>}
       </div>
 
+      <div className="glass rounded-2xl p-5">
+        <p className="text-sm font-semibold text-white">Sessions</p>
+        <p className="mt-1 max-w-md text-xs leading-relaxed text-kore-muted">
+          Revoke every other signed-in device in one action. This device stays
+          signed in; everywhere else must authenticate again.
+        </p>
+        <button
+          onClick={async () => {
+            setBusy(true);
+            setError(null);
+            try {
+              const { createClient } = await import("@/lib/supabase/client");
+              const supabase = createClient();
+              const { error: err } = await supabase.auth.signOut({ scope: "others" });
+              if (err) throw new Error(err.message);
+              setError(null);
+              window.location.reload();
+            } catch (e) {
+              setError(e instanceof Error ? e.message : "Could not revoke sessions.");
+            } finally {
+              setBusy(false);
+            }
+          }}
+          disabled={busy}
+          className="mt-4 rounded-full border border-white/15 px-4 py-2 text-xs text-kore-text transition hover:border-white/40 hover:text-white disabled:opacity-50"
+        >
+          {busy ? "Revoking…" : "Sign out everywhere else"}
+        </button>
+      </div>
+
       <LoginHistory />
     </div>
   );

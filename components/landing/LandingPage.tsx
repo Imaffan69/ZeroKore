@@ -829,8 +829,12 @@ function Footer() {
           </span>
         </div>
         <nav aria-label="Footer" className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-kore-muted">
+          <Link href="/web" className="transition-colors hover:text-white">Web</Link>
+          <Link href="/cloud" className="transition-colors hover:text-white">Cloud</Link>
+          <Link href="/chat" className="transition-colors hover:text-white">Chat</Link>
+          <Link href="/cli" className="transition-colors hover:text-white">CLI</Link>
+          <Link href="/desktop" className="transition-colors hover:text-white">Desktop</Link>
           <Link href="/#engine" className="transition-colors hover:text-white">Engine</Link>
-          <Link href="/#agentic" className="transition-colors hover:text-white">Agent</Link>
           <Link href="/pricing" className="transition-colors hover:text-white">Pricing</Link>
           <Link href="/earn" className="transition-colors hover:text-white">Earn</Link>
           <Link href="/students" className="transition-colors hover:text-white">Students</Link>
