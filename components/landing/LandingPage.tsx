@@ -69,10 +69,10 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 /* ------------------------------------------------------------------- nav */
 
 const PRODUCTS = [
-  { href: "/#engine", label: "Web", note: "Build apps in the browser" },
-  { href: "/#engine", label: "Cloud", note: "Import any GitHub repo" },
-  { href: "/#agentic", label: "Chat", note: "Talk to the agent" },
-  { href: "/#engine", label: "Terminal", note: "Real commands, real files" },
+  { href: "/web", label: "Web", note: "Build apps in the browser" },
+  { href: "/cloud", label: "Cloud", note: "Import any GitHub repo" },
+  { href: "/chat", label: "Chat", note: "Talk to the agent" },
+  { href: "/cli", label: "CLI", note: "Local terminal companion" },
 ] as const;
 
 function Nav() {
