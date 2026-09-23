@@ -137,6 +137,51 @@ function UsernameRow({ onToast }: { onToast: (msg: string) => void }) {
   );
 }
 
+/**
+ * Staff-only entry point to the hidden control panel.
+ *
+ * Renders nothing at all for ordinary accounts, so the panel stays unlisted.
+ * This is convenience only — /kore/admin re-checks the role server-side on
+ * every request, and the panel APIs enforce their own thresholds.
+ */
+function StaffRow() {
+  const [identity, setIdentity] = useState<{ role: string; isStaff: boolean } | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/account/identity");
+        if (res.ok) {
+          const data = await res.json();
+          setIdentity({ role: data.role, isStaff: Boolean(data.isStaff) });
+        }
+      } catch {
+        // silent — the row simply stays hidden
+      }
+    })();
+  }, []);
+
+  if (!identity?.isStaff) return null;
+
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-kore-muted">Access level</span>
+      <span className="flex items-center gap-2">
+        <span className="rounded-full border border-kore-accent/40 bg-kore-accent/10 px-2 py-0.5 font-mono text-[11px] uppercase tracking-wide text-kore-accent">
+          {identity.role}
+        </span>
+        <Link
+          href="/kore/admin"
+          className="inline-flex items-center gap-1 text-xs font-medium text-kore-accent hover:underline"
+        >
+          Control panel
+          <ExternalLink className="h-3 w-3" aria-hidden />
+        </Link>
+      </span>
+    </div>
+  );
+}
+
 function StatusRow({
   label,
   ok,
@@ -330,6 +375,7 @@ export default function SettingsPanel({
                       <ExternalLink className="h-3 w-3" aria-hidden />
                     </Link>
                   </div>
+                  <StaffRow />
                 </div>
               </motion.section>
 

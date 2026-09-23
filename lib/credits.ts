@@ -6,6 +6,7 @@ import {
   type PlanId,
 } from "@/lib/plans";
 import { createServiceClient } from "@/lib/supabase/server";
+import { platformReady } from "@/lib/platform";
 
 /**
  * Server-side credits engine.
@@ -27,6 +28,8 @@ export interface CreditState {
   dailyAllowance: number;
   plan: PlanId;
   unlimited: boolean;
+  /** True while the platform migration is pending: nothing is charged yet. */
+  unenforced?: boolean;
 }
 
 function todayUTC(): string {
@@ -61,6 +64,7 @@ async function loadProfile(db: Db, userId: string) {
 
 /** Student bonus only counts while a verification is unexpired. */
 async function studentBonusActive(db: Db, userId: string): Promise<boolean> {
+  if (!(await platformReady())) return false;
   db = await svc();
   const { data } = await db
     .from("student_verifications")
@@ -78,6 +82,7 @@ async function ledger(
   reason: string,
   metadata: Record<string, unknown> = {}
 ): Promise<void> {
+  if (!(await platformReady())) return;
   db = await svc();
   await db.from("credit_ledger").insert({
     user_id: userId,
@@ -91,8 +96,21 @@ async function ledger(
 export async function getCreditState(db: Db, userId: string): Promise<CreditState> {
   db = await svc();
   const profile = await loadProfile(db, userId);
-  const unlimited = profile.role === "admin" || profile.role === "owner";
   const allowance = dailyCreditsFor(profile.plan, profile.override);
+  const unlimited = profile.role === "admin" || profile.role === "owner";
+
+  // Migration pending: report the plan's allowance as spendable but mark the
+  // state unenforced so nothing is charged and no request is ever blocked.
+  if (!(await platformReady())) {
+    return {
+      balance: allowance,
+      dailyAllowance: allowance,
+      plan: profile.plan,
+      unlimited: true,
+      unenforced: true,
+    };
+  }
+
   let bonus = 0;
   if (profile.plan !== "team" && (await studentBonusActive(db, userId))) {
     bonus = STUDENT_BONUS;
@@ -148,6 +166,7 @@ export async function chargeCredits(
   reason: string,
   metadata: Record<string, unknown> = {}
 ): Promise<number> {
+  if (!(await platformReady())) return 0;
   db = await svc();
   const { data: row } = await db
     .from("credits")
@@ -228,6 +247,7 @@ export async function grantCredits(
   reason: string,
   metadata: Record<string, unknown> = {}
 ): Promise<void> {
+  if (!(await platformReady())) return;
   db = await svc();
   const { data: row } = await db
     .from("credits")

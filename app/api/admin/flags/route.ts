@@ -8,7 +8,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 export async function GET() {
   try {
     const { supabase, user } = await requireUser();
-    await requireRole(supabase, user.id, "admin");
+    await requireRole(supabase, user.id, "admin", user.email);
     const db = await createServiceClient();
     const flag = await getMaintenanceFlag(db);
     return NextResponse.json({ maintenance: flag });
@@ -20,7 +20,7 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const { supabase, user } = await requireUser();
-    await requireRole(supabase, user.id, "owner"); // shutdown is owner-only
+    await requireRole(supabase, user.id, "owner", user.email); // shutdown is owner-only
     const db = await createServiceClient();
     const body = await readJson(req);
     if (typeof body.enabled !== "boolean") {

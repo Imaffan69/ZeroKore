@@ -33,23 +33,71 @@ export interface RbacContext {
   role: Role;
   isAdmin: boolean; // admin or owner
   isOwner: boolean;
+  isStaff: boolean; // viewer and above — may see staff-only surfaces
+}
+
+/**
+ * Owner bootstrap from environment.
+ *
+ * The very first owner cannot be created from inside the app: `profiles` is
+ * guarded by a trigger that rejects every role change, and the role column
+ * defaults to 'user'. Rather than depending on a one-off SQL edit, the owner
+ * account(s) can be declared once in the deployment environment. The email is
+ * matched on every authorization read, server-side, and never trusted from the
+ * client.
+ *
+ * Accepts `OWNER_EMAIL` or `OWNER_EMAILS`, comma-separated for several staff
+ * accounts (e.g. `me@example.com,ops@example.com`).
+ */
+export function ownerEmails(): string[] {
+  const raw = `${process.env.OWNER_EMAIL ?? ""},${process.env.OWNER_EMAILS ?? ""}`;
+  return Array.from(
+    new Set(
+      raw
+        .split(",")
+        .map((value) => value.trim().toLowerCase())
+        .filter((value) => value.includes("@") && value.length > 3)
+    )
+  );
 }
 
 export async function getRbac(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: SupabaseClient<any>,
-  userId: string
+  userId: string,
+  email?: string | null
 ): Promise<RbacContext> {
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role")
+    .select("role, email")
     .eq("id", userId)
     .maybeSingle();
-  const role = (profile?.role as Role) ?? "user";
+
+  let role = (profile?.role as Role) ?? "user";
+
+  // Environment-declared owners always win, so admin access is never lost to a
+  // missing database row.
+  const boot = ownerEmails();
+  if (boot.length > 0) {
+    let candidate = (email ?? profile?.email ?? null)?.toString().toLowerCase() ?? null;
+    if (!candidate) {
+      // Profiles may be missing (trigger not installed yet) — the user's own
+      // auth record is still readable with their session.
+      try {
+        const { data } = await supabase.auth.getUser();
+        candidate = data.user?.email?.toLowerCase() ?? null;
+      } catch {
+        candidate = null;
+      }
+    }
+    if (candidate && boot.includes(candidate)) role = "owner";
+  }
+
   return {
     role,
     isAdmin: rankOf(role) >= ROLE_RANK.admin,
     isOwner: role === "owner",
+    isStaff: rankOf(role) >= ROLE_RANK.viewer,
   };
 }
 
@@ -65,9 +113,10 @@ export async function requireRole(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: SupabaseClient<any>,
   userId: string,
-  min: Role
+  min: Role,
+  email?: string | null
 ): Promise<RbacContext> {
-  const ctx = await getRbac(supabase, userId);
+  const ctx = await getRbac(supabase, userId, email);
   if (!hasRole(ctx.role, min)) throw new ForbiddenError();
   return ctx;
 }

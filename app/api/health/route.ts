@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { providerCatalog } from "@/lib/ai/cascade-router";
 import { isEncryptionConfigured } from "@/lib/crypto";
+import { platformReady } from "@/lib/platform";
 
 /**
  * Truthful health/config snapshot. Public (read-only, no secrets):
@@ -15,6 +16,9 @@ export async function GET() {
 
   return NextResponse.json({
     application: "healthy",
+    // "migration pending" means supabase/migrations/*.sql has not been applied:
+    // credits are not charged yet and staff tables are absent.
+    platform: (await platformReady()) ? "ready" : "migration pending",
     database: process.env.NEXT_PUBLIC_SUPABASE_URL
       ? "configured"
       : "not configured",

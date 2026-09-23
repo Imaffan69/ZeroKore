@@ -46,6 +46,9 @@ export async function GET() {
       dailyAllowance: state.dailyAllowance,
       unlimited: state.unlimited,
       plan: state.plan,
+      // True while the platform migration is pending — credits are displayed
+      // but not enforced, and the UI says so rather than faking a balance.
+      unenforced: state.unenforced === true,
       ledger: ledger.data ?? [],
       runs: runs.data ?? [],
       byModel,

@@ -9,7 +9,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 export async function GET() {
   try {
     const { supabase, user } = await requireUser();
-    await requireRole(supabase, user.id, "admin");
+    await requireRole(supabase, user.id, "admin", user.email);
     const db = await createServiceClient();
     const { data, error } = await db
       .from("announcements")
@@ -26,7 +26,7 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const { supabase, user } = await requireUser();
-    await requireRole(supabase, user.id, "admin");
+    await requireRole(supabase, user.id, "admin", user.email);
     const db = await createServiceClient();
     const body = await readJson(req);
     const kind = readString(body, "kind", 20) || "post";
@@ -53,7 +53,7 @@ export async function POST(req: Request) {
 export async function PATCH(req: Request) {
   try {
     const { supabase, user } = await requireUser();
-    await requireRole(supabase, user.id, "admin");
+    await requireRole(supabase, user.id, "admin", user.email);
     const db = await createServiceClient();
     const body = await readJson(req);
     const id = readString(body, "id", 100);
@@ -73,7 +73,7 @@ export async function PATCH(req: Request) {
 export async function DELETE(req: Request) {
   try {
     const { supabase, user } = await requireUser();
-    await requireRole(supabase, user.id, "admin");
+    await requireRole(supabase, user.id, "admin", user.email);
     const db = await createServiceClient();
     const body = await readJson(req);
     const id = readString(body, "id", 100);

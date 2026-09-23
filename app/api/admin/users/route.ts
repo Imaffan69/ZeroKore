@@ -17,7 +17,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 export async function GET(req: Request) {
   try {
     const { supabase, user } = await requireUser();
-    await requireRole(supabase, user.id, "admin");
+    await requireRole(supabase, user.id, "admin", user.email);
     const db = await createServiceClient();
     const url = new URL(req.url);
     const q = (url.searchParams.get("q") ?? "").trim().toLowerCase();
@@ -42,7 +42,7 @@ export async function GET(req: Request) {
 export async function PATCH(req: Request) {
   try {
     const { supabase, user } = await requireUser();
-    const ctx = await requireRole(supabase, user.id, "admin");
+    const ctx = await requireRole(supabase, user.id, "admin", user.email);
     const db = await createServiceClient();
     const body = await readJson(req);
     const targetId = readString(body, "userId", 100);

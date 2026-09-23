@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { checkAndIncrementUsage, refundUsage } from "@/lib/usage";
+import {
+  checkAndIncrementUsage,
+  refundUsage,
+  getUsageState,
+} from "@/lib/usage";
+import type { UsageState } from "@/types";
 import {
   reserveCredits,
   settleRun,
@@ -112,26 +117,18 @@ export async function POST(req: NextRequest) {
     projectId = requestedProjectId;
   }
 
-  // Server-side rate limit (15/day for users, unlimited for admins).
-  let usageCheck;
+  // Counting is for stats only: the credits balance is the real gate, so a
+  // failure here must never block a run (and the old 15/day hard stop is gone).
+  let usageState: UsageState | undefined;
   try {
-    usageCheck = await checkAndIncrementUsage(supabase, user.id);
+    const counted = await checkAndIncrementUsage(supabase, user.id);
+    usageState = counted.usage;
   } catch {
-    return NextResponse.json(
-      { error: "Could not verify usage. Please try again." },
-      { status: 500 }
-    );
+    console.log(JSON.stringify({ event: "usage_increment_failed" }));
+    usageState = await getUsageState(supabase, user.id).catch(() => undefined);
   }
-  if (!usageCheck.allowed) {
-    return NextResponse.json(
-      {
-        error:
-          "Daily AI request limit reached (15/15). Resets tomorrow. Your conversation and typed input are preserved.",
-        usage: usageCheck.usage,
-      },
-      { status: 429 }
-    );
-  }
+  // Reporting state only — a failed read must never fail the run.
+  const usage: UsageState = usageState ?? { used: 0, limit: 0, unlimited: true };
 
   // Credits: reserve the base cost up-front, settle with real token counts
   // after the run, refund on failure. Admins/owners are exempt (unlimited).
@@ -206,7 +203,7 @@ export async function POST(req: NextRequest) {
       artifact: result.artifact,
       provider: result.provider,
       fallbackFrom: result.fallbackFrom,
-      usage: usageCheck.usage,
+      usage,
     };
     return NextResponse.json({ ...response, savedTo });
   } catch (err) {
@@ -214,7 +211,7 @@ export async function POST(req: NextRequest) {
     const msg =
       err instanceof Error ? err.message : "Agent request failed.";
     // A failed call produced nothing, so it is not charged.
-    const refunded = await refundUsage(supabase, user.id, usageCheck.usage);
+    await refundUsage(supabase, user.id, usage);
     try {
       await refundRun(supabase, user.id, BASE_CREDIT_COST);
     } catch {
@@ -225,7 +222,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         error: msg,
-        usage: refunded,
+        usage,
       },
       { status }
     );

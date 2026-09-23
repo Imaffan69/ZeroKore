@@ -12,7 +12,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 export async function GET() {
   try {
     const { supabase, user } = await requireUser();
-    await requireRole(supabase, user.id, "admin");
+    await requireRole(supabase, user.id, "admin", user.email);
     const db = await createServiceClient();
     await audit(db, user.id, "admin.security.view", "login_events");
 

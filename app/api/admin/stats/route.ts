@@ -9,7 +9,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 export async function GET() {
   try {
     const { supabase, user } = await requireUser();
-    await requireRole(supabase, user.id, "admin");
+    await requireRole(supabase, user.id, "viewer", user.email);
     const db = await createServiceClient();
 
     const [users, projects, conversations, runs, feedback, credits] = await Promise.all([

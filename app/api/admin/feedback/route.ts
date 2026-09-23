@@ -3,11 +3,11 @@ import { requireUser, errorResponse, readJson, readString, BadRequestError } fro
 import { requireRole, audit } from "@/lib/rbac";
 import { createServiceClient } from "@/lib/supabase/server";
 
-/** Feedback inbox: admin+ read, moderator+ can change status. */
+/** Feedback inbox: moderator+ read (support and up see it), moderator+ can change status. */
 export async function GET(req: Request) {
   try {
     const { supabase, user } = await requireUser();
-    await requireRole(supabase, user.id, "admin");
+    await requireRole(supabase, user.id, "moderator", user.email);
     const db = await createServiceClient();
     const url = new URL(req.url);
     const status = url.searchParams.get("status");
@@ -45,7 +45,7 @@ export async function GET(req: Request) {
 export async function PATCH(req: Request) {
   try {
     const { supabase, user } = await requireUser();
-    await requireRole(supabase, user.id, "moderator");
+    await requireRole(supabase, user.id, "moderator", user.email);
     const db = await createServiceClient();
     const body = await readJson(req);
     const id = readString(body, "id", 100);

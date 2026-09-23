@@ -19,8 +19,9 @@ export const dynamic = "force-dynamic";
 export default async function KoreAdminPage() {
   const user = await requireSession("/kore/admin");
   const supabase = await createClient();
-  const rbac = await getRbac(supabase, user.id);
-  if (!rbac.isAdmin) notFound();
+  const rbac = await getRbac(supabase, user.id, user.email);
+  // Sub-staff ranks get an ordinary 404 — the panel's existence is not revealed.
+  if (!rbac.isStaff) notFound();
 
   return <AdminPanel role={rbac.role} isOwner={rbac.isOwner} />;
 }
