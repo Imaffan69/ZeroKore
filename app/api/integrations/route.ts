@@ -26,7 +26,7 @@ export async function GET() {
       .from("integrations")
       .select("id, provider, label, encrypted_key, created_at")
       .eq("user_id", user.id);
-    const integrations = (data ?? []).map((row) => {
+    const integrations = (data ?? []).map((row: { id: string; provider: string; label: string | null; encrypted_key: string; created_at: string }) => {
       let preview = "••••••••";
       try {
         preview = mask(decryptSecret(row.encrypted_key));
@@ -49,7 +49,7 @@ export async function POST(req: Request) {
         { status: 503 }
       );
     }
-    const { supabase, user } = await requireUser();
+    const { user } = await requireUser();
     const body = await readJson(req);
     const provider = readString(body, "provider", 20) as Provider;
     const apiKey = readString(body, "key", 500);
@@ -73,7 +73,7 @@ export async function POST(req: Request) {
 
 export async function DELETE(req: Request) {
   try {
-    const { supabase, user } = await requireUser();
+    const { user } = await requireUser();
     const body = await readJson(req);
     const provider = readString(body, "provider", 20) as Provider;
     if (!PROVIDERS.includes(provider)) {

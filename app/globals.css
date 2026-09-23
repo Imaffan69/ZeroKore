@@ -304,3 +304,113 @@ body {
 ::selection {
   background: rgba(255, 255, 255, 0.2);
 }
+
+/* ----------------------------------------------------------------
+   Rendered markdown (skills browser, artifacts)
+   Scoped to .md-body so it can never leak into app chrome. The
+   renderer emits bare tags with no classes, so styling lives here.
+   ---------------------------------------------------------------- */
+.md-body {
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 0.875rem;
+  line-height: 1.7;
+}
+.md-body > * + * {
+  margin-top: 0.85rem;
+}
+.md-body h2,
+.md-body h3,
+.md-body h4,
+.md-body h5,
+.md-body h6 {
+  color: #fff;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+  margin-top: 1.6rem;
+}
+.md-body h2 {
+  font-size: 1.15rem;
+}
+.md-body h3 {
+  font-size: 1.03rem;
+}
+.md-body h4,
+.md-body h5,
+.md-body h6 {
+  font-size: 0.94rem;
+}
+.md-body strong {
+  color: #fff;
+  font-weight: 600;
+}
+.md-body em {
+  color: rgba(255, 255, 255, 0.92);
+}
+.md-body a {
+  color: var(--kore-accent, #b5cfa0);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(181, 207, 160, 0.35);
+}
+.md-body a:hover {
+  border-bottom-color: rgba(181, 207, 160, 0.8);
+}
+.md-body ul,
+.md-body ol {
+  padding-left: 1.15rem;
+}
+.md-body li {
+  margin-top: 0.3rem;
+}
+.md-body ul > li {
+  list-style: none;
+  position: relative;
+}
+.md-body ul > li::before {
+  content: "";
+  position: absolute;
+  left: -0.95rem;
+  top: 0.62em;
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(181, 207, 160, 0.7);
+}
+.md-body ol > li {
+  list-style: decimal;
+}
+.md-body code {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.78em;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  padding: 0.1em 0.35em;
+}
+.md-body pre {
+  position: relative;
+  overflow-x: auto;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 0.9rem 1rem;
+}
+.md-body pre code {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 0.78rem;
+  line-height: 1.65;
+}
+.md-body blockquote {
+  border-left: 2px solid rgba(181, 207, 160, 0.5);
+  padding: 0.15rem 0 0.15rem 0.9rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+.md-body hr {
+  border: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+

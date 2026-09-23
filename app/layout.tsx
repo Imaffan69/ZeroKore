@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import FeedbackModal from "@/components/site/FeedbackModal";
+import SiteBanner, { MaintenanceBanner } from "@/components/site/SiteBanner";
 import { createClient } from "@/lib/supabase/server";
 import { getMaintenanceFlag } from "@/lib/flags";
 
@@ -18,7 +19,18 @@ export const metadata: Metadata = {
   },
 };
 
-async function maintenanceForViewer(): Promise<{ enabled: boolean; message: string } | null> {
+/**
+ * Maintenance state for this viewer.
+ *
+ * `enabled` is the raw flag; `visible` says whether it applies to the caller —
+ * staff keep full access during maintenance so they can work on the fix, and
+ * only see an informational strip instead of the blocking screen.
+ */
+async function maintenanceForViewer(): Promise<{
+  enabled: boolean;
+  message: string;
+  visible: boolean;
+} | null> {
   try {
     const supabase = await createClient();
     const flag = await getMaintenanceFlag(supabase);
@@ -33,9 +45,11 @@ async function maintenanceForViewer(): Promise<{ enabled: boolean; message: stri
         .eq("id", user.id)
         .maybeSingle();
       const role = profile?.role ?? "user";
-      if (["support", "moderator", "admin", "owner"].includes(role)) return null;
+      if (["support", "moderator", "admin", "owner"].includes(role)) {
+        return { enabled: true, message: flag.message, visible: false };
+      }
     }
-    return flag;
+    return { enabled: true, message: flag.message, visible: true };
   } catch {
     return null; // a DB failure never takes the site down
   }
@@ -67,7 +81,15 @@ export default async function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className="min-h-screen bg-kore-bg text-kore-text">
-        {maintenance ? <MaintenanceScreen message={maintenance.message} /> : children}
+        {maintenance?.visible ? (
+          <MaintenanceScreen message={maintenance.message} />
+        ) : (
+          <>
+            {maintenance?.enabled && <MaintenanceBanner message={maintenance.message} />}
+            <SiteBanner />
+            {children}
+          </>
+        )}
         <FeedbackModal />
       </body>
     </html>

@@ -51,6 +51,93 @@ const ACTIONS = [
   },
 ] as const;
 
+/**
+ * Live account strip.
+ *
+ * The navigator used to open with nothing but a heading, which read as an empty
+ * page. These four tiles are all real reads — daily credits, active plan, model
+ * cascade state and project count — so the first screen answers "what do I have
+ * and what can I do right now?" without a scroll.
+ */
+function AccountStrip({ projects }: { projects: number }) {
+  const [credits, setCredits] = useState<{ balance: number; dailyAllowance: number; plan: string } | null>(null);
+  const [models, setModels] = useState<{ configured: number; total: number } | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/account/credits");
+        if (res.ok) setCredits(await res.json());
+      } catch {
+        // the tile falls back to a dash
+      }
+    })();
+    (async () => {
+      try {
+        const res = await fetch("/api/health");
+        if (res.ok) {
+          const data = await res.json();
+          const entries = Object.values(data.models ?? {});
+          setModels({
+            configured: entries.filter((v) => v === "configured").length,
+            total: entries.length || 4,
+          });
+        }
+      } catch {
+        // the tile falls back to a dash
+      }
+    })();
+  }, []);
+
+  const tiles = [
+    {
+      label: "CREDITS TODAY",
+      value: credits ? `${credits.balance}` : "—",
+      hint: credits ? `of ${credits.dailyAllowance} daily` : "loading",
+    },
+    {
+      label: "PLAN",
+      value: credits ? credits.plan.toUpperCase() : "—",
+      hint: "resets daily at 00:00 UTC",
+    },
+    {
+      label: "MODELS",
+      value: models ? `${models.configured}/${models.total}` : "—",
+      hint: "providers online in cascade",
+    },
+    {
+      label: "PROJECTS",
+      value: `${projects}`,
+      hint: projects === 1 ? "1 workspace" : `${projects} workspaces`,
+    },
+  ];
+
+  return (
+    <motion.div
+      variants={staggerGroup(0.05, 0.05)}
+      initial="hidden"
+      animate="visible"
+      className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4"
+    >
+      {tiles.map((tile) => (
+        <motion.div
+          key={tile.label}
+          variants={fadeUp}
+          className="glass glass-sheen rounded-2xl px-4 py-3"
+        >
+          <p className="font-mono text-[10px] tracking-[0.18em] text-kore-muted">
+            {tile.label}
+          </p>
+          <p className="mt-1.5 text-xl font-semibold tracking-tight text-white">
+            {tile.value}
+          </p>
+          <p className="mt-0.5 text-[11px] text-kore-faint">{tile.hint}</p>
+        </motion.div>
+      ))}
+    </motion.div>
+  );
+}
+
 export default function ProjectsNavigator({
   email,
   username,
@@ -182,6 +269,8 @@ export default function ProjectsNavigator({
             )}
           </motion.p>
         </motion.header>
+
+        <AccountStrip projects={count} />
 
         <motion.div
           variants={staggerGroup(0.06, 0.1)}

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import LandingPage from "@/components/landing/LandingPage";
 import { createClient } from "@/lib/supabase/server";
+import { getSiteFlags } from "@/lib/flags";
 
 export const metadata: Metadata = {
   title: "ZeroKore — Autonomous agentic development workspace",
@@ -24,6 +25,6 @@ async function getTotalUsers(): Promise<number | null> {
 }
 
 export default async function HomePage() {
-  const totalUsers = await getTotalUsers();
-  return <LandingPage totalUsers={totalUsers} />;
+  const [totalUsers, flags] = await Promise.all([getTotalUsers(), getSiteFlags()]);
+  return <LandingPage totalUsers={totalUsers} version={flags.version} />;
 }

@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireUser, errorResponse } from "@/lib/api-auth";
 import { getCreditState } from "@/lib/credits";
-import { dailyCreditsFor } from "@/lib/plans";
 
 export const dynamic = "force-dynamic";
 

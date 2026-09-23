@@ -34,6 +34,13 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      {
+        // The staff control panel is unlisted: robots.txt disallows it, and this
+        // header stops search engines that ignore robots.txt from indexing it.
+        // Authorization itself is enforced server-side on every request.
+        source: "/kore/:path*",
+        headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" }],
+      },
     ];
   },
   /**

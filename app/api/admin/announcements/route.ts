@@ -9,7 +9,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 export async function GET() {
   try {
     const { supabase, user } = await requireUser();
-    await requireRole(supabase, user.id, "admin", user.email);
+    await requireRole(supabase, user.id, "moderator", user.email);
     const db = await createServiceClient();
     const { data, error } = await db
       .from("announcements")
@@ -26,7 +26,7 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const { supabase, user } = await requireUser();
-    await requireRole(supabase, user.id, "admin", user.email);
+    await requireRole(supabase, user.id, "moderator", user.email);
     const db = await createServiceClient();
     const body = await readJson(req);
     const kind = readString(body, "kind", 20) || "post";

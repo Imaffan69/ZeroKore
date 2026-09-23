@@ -118,6 +118,52 @@ accounts, bad credentials, unverified accounts, and network errors. The signup
 trigger creates a `profiles` row (role `user`) and a `user_usage` row
 idempotently. Logout invalidates the session and redirects to login.
 
+## Usage limits
+
+Replaced by the credits economy (`lib/credits.ts` + `lib/plans.ts`): every
+account gets a daily credit allowance that resets at 00:00 UTC — Free **30**,
+Plus **100**, Pro **350**, Max **600**, Teams a per-workspace override, and a
+verified student adds **+50**. One credit covers the base cost of a run, plus one
+credit per 4k tokens of measured prompt + completion. Spend, refund and grant
+events all land in `credit_ledger`. `admin`/`owner` accounts are exempt. While the
+platform migration is pending, `/api/account/credits` reports `unenforced: true`
+so the UI says the balance is informational rather than pretending to enforce it.
+
+## Control panel (staff only)
+
+The staff panel is deliberately unlisted:
+
+| Path | Behaviour |
+|---|---|
+| `/kore` | Redirects to `/`. A dead end — nothing identifies it. |
+| `/kore/admin` | The panel. Non-staff visitors get an ordinary **404**, identical to any missing page. |
+
+Access is decided server-side on every request (`lib/rbac.ts`), never from client
+state. There are two ways to become staff:
+
+1. **Environment bootstrap** — `OWNER_EMAIL` (full authority) and
+   `ADMIN_EMAILS` (comma-separated, `admin` rank). Emails are matched
+   case-insensitively against the Supabase login address, so access works before
+   any SQL has been applied. `/api/health` reports `staff` as a count so you can
+   confirm it is picked up without publishing the addresses.
+2. **Granted in the database** — `profiles.role`, one of
+   `user < viewer < support < moderator < admin < owner`. Only the owner can
+   change roles from the panel, and every change is written to `admin_audit`.
+
+Tabs unlock by rank: **Overview** (viewer+) · **Feedback** (moderator+) ·
+**Users**, **Security & IPs**, **Announcements**, **Site control** (admin+).
+`Site control` holds the maintenance-mode switch and is owner-only. Staff also
+see a small "Access level" row in **Settings → Account** linking to the panel;
+ordinary accounts see nothing at all. `robots.txt` disallows `/kore`, and
+`/kore/*` is served with `X-Robots-Tag: noindex, nofollow, noarchive`.
+
+## Request logging & privacy
+
+Signup and sign-in events record IP address, approximate location derived from
+that IP, and device/browser from the user-agent (`login_events`, surfaced to
+staff in **Security & IPs** and to the account owner in **Sign-in & security**).
+This is disclosed in `/privacy`. Nothing here is used for advertising.
+
 ## Database & RLS
 
 Every user-owned table has RLS; policies use `auth.uid()` only — the client
@@ -132,13 +178,6 @@ matched route (even routes that do not exist), which took the whole site down.
 A gate in a server layout cannot do that — an error there is contained to
 `/dashboard`, which is why public pages keep rendering when Supabase is missing,
 malformed, or unreachable.
-
-## Usage limits
-
-15 AI requests/day for `user` role, unlimited for `admin`, enforced in
-`lib/usage.ts` (counter resets when the stored UTC date is stale). The
-sidebar shows `used / limit` with a gauge; admins see `Unlimited`. On 429 the
-UI disables send, explains the reset, and preserves conversation + typed input.
 
 ## Agent pipeline
 

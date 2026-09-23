@@ -81,28 +81,21 @@ export async function PATCH(req: Request) {
 
     const { error } = await db.from("profiles").update(updates).eq("id", targetId);
     if (error) {
-      // The anti-escalation trigger rejects role changes on UPDATE even for
-      // the service client. The edit is still legitimate and owner-approved,
-      // so fall back to delete + re-insert of the same row with the new role
-      // (nothing references profiles, and INSERT has no such trigger).
+      // Migration 002 narrows the anti-escalation trigger to *self* changes, so
+      // a service-role role update succeeds normally. If we still see the old
+      // blanket rejection, the migration has not been applied yet — say so
+      // instead of guessing, because the only other way to force a role was
+      // deleting and re-inserting the row (which risks cascading user data).
       if (typeof updates.role === "string" && /Role changes/i.test(error.message)) {
-        const { data: full } = await db.from("profiles").select("*").eq("id", targetId).single();
-        if (full) {
-          await db.from("profiles").delete().eq("id", targetId);
-          const { error: insErr } = await db
-            .from("profiles")
-            .insert({ ...full, role: updates.role });
-          if (insErr) {
-            // Best effort restore if the insert failed for any reason.
-            await db.from("profiles").insert({ ...full });
-            return NextResponse.json({ error: "Role update failed." }, { status: 500 });
-          }
-        } else {
-          return NextResponse.json({ error: "Update failed." }, { status: 500 });
-        }
-      } else {
-        return NextResponse.json({ error: "Update failed." }, { status: 500 });
+        return NextResponse.json(
+          {
+            error:
+              "Role changes are blocked by the database. Run supabase/migrations/002_role_guard.sql, then retry.",
+          },
+          { status: 409 }
+        );
       }
+      return NextResponse.json({ error: "Update failed." }, { status: 500 });
     }
 
     if (typeof body.grant_credits === "number" && body.grant_credits > 0) {

@@ -61,6 +61,29 @@ export function ownerEmails(): string[] {
   );
 }
 
+/**
+ * Staff bootstrap from environment.
+ *
+ * Owner bootstrap (see ownerEmails) covers the single account that must never
+ * lose access. `ADMIN_EMAILS` is the wider list — every address there gets the
+ * `admin` rank unless a higher role is already recorded, which makes it
+ * possible to hand out staff access before the platform migration has been
+ * applied (the `profiles` trigger refuses role writes made by users).
+ *
+ * Both lists are read server-side only and never trusted from the client.
+ */
+export function adminEmails(): string[] {
+  const raw = process.env.ADMIN_EMAILS ?? "";
+  return Array.from(
+    new Set(
+      raw
+        .split(",")
+        .map((value) => value.trim().toLowerCase())
+        .filter((value) => value.includes("@") && value.length > 3)
+    )
+  );
+}
+
 export async function getRbac(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: SupabaseClient<any>,
@@ -78,8 +101,9 @@ export async function getRbac(
   // Environment-declared owners always win, so admin access is never lost to a
   // missing database row.
   const boot = ownerEmails();
+  let candidate: string | null = null;
   if (boot.length > 0) {
-    let candidate = (email ?? profile?.email ?? null)?.toString().toLowerCase() ?? null;
+    candidate = (email ?? profile?.email ?? null)?.toString().toLowerCase() ?? null;
     if (!candidate) {
       // Profiles may be missing (trigger not installed yet) — the user's own
       // auth record is still readable with their session.
@@ -91,6 +115,18 @@ export async function getRbac(
       }
     }
     if (candidate && boot.includes(candidate)) role = "owner";
+  }
+
+  // Wider staff list: never lowers a role, only raises to admin.
+  const admins = adminEmails();
+  if (admins.length > 0) {
+    if (!candidate) {
+      candidate =
+        (email ?? profile?.email ?? null)?.toString().toLowerCase() ?? null;
+    }
+    if (candidate && admins.includes(candidate) && rankOf(role) < ROLE_RANK.admin) {
+      role = "admin";
+    }
   }
 
   return {

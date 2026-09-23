@@ -19,7 +19,7 @@ const ACADEMIC_DOMAIN = /(^|\.)edu(\.[a-z]{2,})?$|(^|\.)ac\.[a-z]{2,}$|(^|\.)edu
 
 export async function POST(req: Request) {
   try {
-    const { supabase, user } = await requireUser();
+    const { user } = await requireUser();
     const body = await readJson(req);
     const email = readString(body, "email", 200).toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {

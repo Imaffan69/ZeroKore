@@ -25,9 +25,9 @@ const TABS: {
 }[] = [
   { id: "overview", label: "Overview", icon: BarChart3, min: "viewer" },
   { id: "feedback", label: "Feedback", icon: MessageSquare, min: "moderator" },
+  { id: "announcements", label: "Announcements", icon: Megaphone, min: "moderator" },
   { id: "users", label: "Users", icon: Users, min: "admin" },
   { id: "security", label: "Security & IPs", icon: Globe, min: "admin" },
-  { id: "announcements", label: "Announcements", icon: Megaphone, min: "admin" },
   { id: "control", label: "Site control", icon: ShieldAlert, min: "admin" },
 ];
 

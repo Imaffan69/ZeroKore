@@ -88,6 +88,7 @@ function Nav() {
   }, []);
 
   const links = [
+    { href: "/skills", label: "Skills" },
     { href: "/pricing", label: "Pricing" },
     { href: "/earn", label: "Earn" },
     { href: "/blog", label: "Blog" },
@@ -835,10 +836,12 @@ function Footer() {
           <Link href="/cli" className="transition-colors hover:text-white">CLI</Link>
           <Link href="/desktop" className="transition-colors hover:text-white">Desktop</Link>
           <Link href="/#engine" className="transition-colors hover:text-white">Engine</Link>
+          <Link href="/skills" className="transition-colors hover:text-white">Skills</Link>
           <Link href="/pricing" className="transition-colors hover:text-white">Pricing</Link>
           <Link href="/earn" className="transition-colors hover:text-white">Earn</Link>
           <Link href="/students" className="transition-colors hover:text-white">Students</Link>
           <Link href="/blog" className="transition-colors hover:text-white">Blog</Link>
+          <Link href="/changelog" className="transition-colors hover:text-white">Changelog</Link>
           <Link href="/privacy" className="transition-colors hover:text-white">Privacy</Link>
           <Link href="/terms" className="transition-colors hover:text-white">Terms</Link>
         </nav>
@@ -972,17 +975,17 @@ function BlogTeaser() {
   );
 }
 
-function VersionBlock() {
+function VersionBlock({ version }: { version: string }) {
   return (
     <section aria-label="Current version" className="relative pb-4">
       <div className="kore-shell">
         <Reveal>
           <div className="glass flex flex-col items-start justify-between gap-3 rounded-2xl px-5 py-4 sm:flex-row sm:items-center">
             <p className="font-mono text-[11px] tracking-[0.14em] text-kore-muted">
-              ZEROKORE <span className="text-white">v1.4</span> · CREDITS ENGINE LIVE
+              ZEROKORE <span className="text-white">v{version}</span> · CREDITS ENGINE LIVE
             </p>
             <Link
-              href="/blog"
+              href="/changelog"
               className="inline-flex items-center gap-1.5 text-xs text-kore-muted transition-colors hover:text-white"
             >
               Read the changelog
@@ -997,7 +1000,13 @@ function VersionBlock() {
 
 /* ------------------------------------------------------------ composition */
 
-export default function LandingPage({ totalUsers }: { totalUsers: number | null }) {
+export default function LandingPage({
+  totalUsers,
+  version,
+}: {
+  totalUsers: number | null;
+  version: string;
+}) {
   return (
     <div className="relative min-h-screen overflow-x-clip bg-black text-white">
       <ParticleField />
@@ -1014,7 +1023,7 @@ export default function LandingPage({ totalUsers }: { totalUsers: number | null 
           <CreditsPerDay />
           <Pricing />
           <BlogTeaser />
-          <VersionBlock />
+          <VersionBlock version={version} />
           <Cta />
         </main>
         <Footer />
