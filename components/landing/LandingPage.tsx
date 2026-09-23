@@ -267,22 +267,23 @@ function Hero({ totalUsers }: { totalUsers: number | null }) {
       {/* Live particle field, behind everything and never interactive. */}
       <div className="pointer-events-none absolute inset-0">
         <ParticleField
-          density={14}
-          maxParticles={120}
-          linkDistance={140}
-          opacity={0.85}
+          density={22}
+          maxParticles={190}
+          linkDistance={150}
+          opacity={1}
         />
       </div>
       <div className="kore-ambient pointer-events-none absolute inset-0" aria-hidden />
 
-      <div className="kore-shell relative z-10 pt-24">
+      <div className="kore-shell relative z-10 grid items-center gap-10 pt-24 lg:grid-cols-[1.05fr_0.95fr]">
+        <div>
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: EASE }}
           className="glass-subtle inline-flex items-center gap-2 rounded-full px-3.5 py-1.5"
         >
-          <Sparkles className="h-3.5 w-3.5 text-white" aria-hidden />
+          <Sparkles className="h-3.5 w-3.5 text-kore-accent" aria-hidden />
           <span className="font-mono text-[10px] tracking-[0.2em] text-kore-text">
             AGENTIC DEVELOPMENT WORKSPACE
           </span>
@@ -296,7 +297,7 @@ function Hero({ totalUsers }: { totalUsers: number | null }) {
         >
           Your whole build,
           <br />
-          <span className="bg-gradient-to-r from-white via-white/70 to-white/35 bg-clip-text text-transparent">
+          <span className="bg-gradient-to-r from-[#b5cfa0] via-[#e8f3df] to-white bg-clip-text text-transparent">
             in one workspace.
           </span>
         </motion.h1>
@@ -305,7 +306,7 @@ function Hero({ totalUsers }: { totalUsers: number | null }) {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, ease: EASE, delay: 0.12 }}
-          className="mt-6 max-w-2xl text-base leading-relaxed text-kore-muted sm:text-lg"
+          className="mt-6 max-w-2xl text-base leading-relaxed text-kore-body sm:text-lg"
         >
           Start a project from nothing, import any repository you own, then edit
           real files, run commands, review what changed and push it back to Git —
@@ -320,7 +321,7 @@ function Hero({ totalUsers }: { totalUsers: number | null }) {
         >
           <Link
             href="/signup"
-            className="group inline-flex items-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-semibold text-black transition hover:bg-white/85"
+            className="group inline-flex items-center gap-2 rounded-full bg-[#4ade80] px-6 py-3 text-sm font-semibold text-black transition hover:bg-[#b5cfa0]"
           >
             Start building free
             <ArrowRight
@@ -336,14 +337,32 @@ function Hero({ totalUsers }: { totalUsers: number | null }) {
           </a>
         </motion.div>
 
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.7, ease: EASE, delay: 0.26 }}
+          className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-[11px] text-kore-muted"
+        >
+          {totalUsers !== null && totalUsers > 0 && (
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#4ade80]" aria-hidden />
+              Join {totalUsers.toLocaleString()} builders already on ZeroKore
+            </span>
+          )}
+          <span>
+            No credit card · Your projects live at zerokore.vercel.app/&lt;you&gt;/&lt;project&gt;
+          </span>
+        </motion.p>
+        </div>
+
         <motion.div
           initial={{ opacity: 0, y: 28 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, ease: EASE, delay: 0.3 }}
-          className="mt-12 hidden max-w-3xl lg:block"
+          className="relative hidden lg:block"
         >
-          <div className="glass overflow-hidden rounded-2xl text-left shadow-2xl shadow-black/50">
-            <div className="flex items-center gap-1.5 border-b border-white/8 px-4 py-3">
+          <div className="glass overflow-hidden rounded-2xl text-left shadow-2xl shadow-black">
+            <div className="flex items-center gap-1.5 border-b border-white/10 px-4 py-3">
               <span className="h-2.5 w-2.5 rounded-full bg-[#ff5f57]" aria-hidden />
               <span className="h-2.5 w-2.5 rounded-full bg-[#febc2e]" aria-hidden />
               <span className="h-2.5 w-2.5 rounded-full bg-[#28c840]" aria-hidden />
@@ -355,7 +374,7 @@ function Hero({ totalUsers }: { totalUsers: number | null }) {
                     aria-selected={i === 0}
                     className={cn(
                       "rounded-full px-3 py-1 text-[11px]",
-                      i === 0 ? "bg-white/12 text-white" : "text-kore-muted"
+                      i === 0 ? "bg-[#b5cfa0]/20 text-[#e8f3df]" : "text-kore-muted"
                     )}
                   >
                     {t}
@@ -365,31 +384,14 @@ function Hero({ totalUsers }: { totalUsers: number | null }) {
             </div>
             <div className="space-y-1.5 px-5 py-4 font-mono text-[12px] leading-relaxed">
               <p className="text-kore-muted">
-                <span className="text-emerald-400">$</span> agent &quot;add a pricing section&quot;
+                <span className="text-[#4ade80]">$</span> agent &quot;add a pricing section&quot;
               </p>
               <p className="text-kore-text">Read 6 files · mapped components/pricing</p>
-              <p className="text-emerald-300">Edit pricing.tsx +48 −6 · saved</p>
+              <p className="text-[#b5cfa0]">Edit pricing.tsx +48 −6 · saved</p>
               <p className="text-kore-text">Preview updated · pushed to main · 4f2a1de</p>
             </div>
           </div>
         </motion.div>
-
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.7, ease: EASE, delay: 0.26 }}
-          className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-[11px] text-kore-muted"
-        >
-          {totalUsers !== null && totalUsers > 0 && (
-            <span className="flex items-center gap-1.5">
-              <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" aria-hidden />
-              Join {totalUsers.toLocaleString()} builders already on ZeroKore
-            </span>
-          )}
-          <span>
-            No credit card · Your projects live at zerokore.vercel.app/&lt;you&gt;/&lt;project&gt;
-          </span>
-        </motion.p>
       </div>
 
       {/* Scroll cue */}

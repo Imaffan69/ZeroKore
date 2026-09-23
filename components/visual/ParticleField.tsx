@@ -148,8 +148,8 @@ export default function ParticleField({
                 if (q === p) continue;
                 const dist = Math.hypot(q.x - p.x, q.y - p.y);
                 if (dist > linkDistance) continue;
-                ctx!.strokeStyle = `rgba(255,255,255,${
-                  (1 - dist / linkDistance) * 0.1
+                ctx!.strokeStyle = `rgba(181,207,160,${
+                  (1 - dist / linkDistance) * 0.13
                 })`;
                 ctx!.beginPath();
                 ctx!.moveTo(p.x, p.y);
@@ -164,7 +164,7 @@ export default function ParticleField({
       for (const p of particles) {
         ctx!.beginPath();
         ctx!.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-        ctx!.fillStyle = "rgba(255,255,255,0.55)";
+        ctx!.fillStyle = "rgba(181,207,160,0.6)";
         ctx!.fill();
       }
 

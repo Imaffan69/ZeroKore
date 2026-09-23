@@ -12,6 +12,7 @@ import {
   SquareTerminal,
   TerminalSquare,
   LayoutGrid,
+  GitCompare,
 } from "lucide-react";
 import ExecutionTerminal from "@/components/agent/ExecutionTerminal";
 import ToolBar from "@/components/agent/ToolBar";
@@ -19,6 +20,7 @@ import EnvironmentsPanel, {
   type TranscriptLine,
 } from "@/components/projects/EnvironmentsPanel";
 import ProjectShell from "@/components/projects/ProjectShell";
+import ChangesTab from "@/components/projects/ChangesTab";
 import type { FileMeta } from "@/components/projects/FilesPanel";
 import { cn } from "@/lib/utils";
 import { EASE } from "@/lib/motion";
@@ -81,7 +83,7 @@ export default function ProjectWorkspace({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
-  const [panel, setPanel] = useState<"chat" | "environment" | "terminal">("chat");
+  const [panel, setPanel] = useState<"chat" | "environment" | "terminal" | "changes">("chat");
 
   const [credits, setCredits] = useState<{ balance: number; daily: number; plan: string } | null>(null);
   const [skills, setSkills] = useState<{ name: string; description: string }[] | null>(null);
@@ -367,17 +369,18 @@ export default function ProjectWorkspace({
         </p>
       )}
 
-      {/* Chat / environment switcher (small screens) */}
+      {/* Panel switcher (small screens) */}
       <div
-        className="glass-bar grid shrink-0 grid-cols-2 gap-1 p-1.5 xl:hidden"
+        className="glass-bar grid shrink-0 grid-cols-4 gap-1 p-1.5 xl:hidden"
         role="tablist"
         aria-label="Workspace panels"
       >
         {(
           [
             { id: "chat" as const, label: "Agent", icon: TerminalSquare },
-            { id: "environment" as const, label: "Environment", icon: LayoutGrid },
+            { id: "environment" as const, label: "Env", icon: LayoutGrid },
             { id: "terminal" as const, label: "Terminal", icon: SquareTerminal },
+            { id: "changes" as const, label: "Changes", icon: GitCompare },
           ] as const
         ).map((t) => {
           const active = panel === t.id;
@@ -503,11 +506,22 @@ export default function ProjectWorkspace({
         <section
           aria-label="Project terminal"
           className={cn(
-            "min-h-0 flex-col xl:col-span-2 xl:flex xl:h-80",
+            "min-h-0 flex-col xl:flex xl:h-80",
             panel === "terminal" ? "flex" : "hidden xl:flex"
           )}
         >
           <ProjectShell slug={project.slug} onFilesChanged={loadProject} className="h-full w-full" />
+        </section>
+
+        {/* Changes — real +/− diffs from file_versions history */}
+        <section
+          aria-label="Working directory changes"
+          className={cn(
+            "min-h-0 flex-col xl:flex xl:h-80 xl:overflow-hidden xl:rounded-2xl xl:glass xl:glass-sheen",
+            panel === "changes" ? "flex" : "hidden xl:flex"
+          )}
+        >
+          <ChangesTab slug={project.slug} />
         </section>
       </div>
 

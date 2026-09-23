@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import Link from "next/link";
 import {
   FolderPlus,
   Github,
@@ -9,6 +10,8 @@ import {
   ArrowRight,
   AlertTriangle,
   CheckCircle2,
+  Settings2,
+  Cpu,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { EASE, fadeUp, hoverLift, press, staggerGroup } from "@/lib/motion";
@@ -131,7 +134,13 @@ export default function ProjectsNavigator({
               variants={fadeUp}
               className="mt-2 text-2xl font-semibold tracking-[-0.02em] text-white sm:text-3xl"
             >
-              Your projects
+              {username ? (
+                <>
+                  <span className="text-kore-accent">@{username}</span>’s workspace
+                </>
+              ) : (
+                "Your projects"
+              )}
             </motion.h1>
             <motion.p
               variants={fadeUp}
@@ -141,6 +150,22 @@ export default function ProjectsNavigator({
               where you left off. Each project keeps its own files, environments
               and memory at its own URL.
             </motion.p>
+            <motion.div variants={fadeUp} className="mt-3 flex flex-wrap items-center gap-2">
+              <Link
+                href="/account"
+                className="glass-subtle inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-medium text-kore-text transition hover:bg-white/10"
+              >
+                <Settings2 className="h-3.5 w-3.5" aria-hidden />
+                Settings & username
+              </Link>
+              <Link
+                href="/settings"
+                className="glass-subtle inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-medium text-kore-text transition hover:bg-white/10"
+              >
+                <Cpu className="h-3.5 w-3.5" aria-hidden />
+                Models & integrations
+              </Link>
+            </motion.div>
           </div>
           <motion.p
             variants={fadeUp}

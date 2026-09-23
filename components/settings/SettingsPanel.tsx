@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { motion } from "framer-motion";
+import Link from "next/link";
 import {
   User,
   Cpu,
@@ -54,6 +55,86 @@ export interface SettingsPanelProps {
   preferredProvider: ProviderPreference;
   onProviderChange: (p: ProviderPreference) => void;
   onToast: (msg: string) => void;
+}
+
+function UsernameRow({ onToast }: { onToast: (msg: string) => void }) {
+  const [username, setUsername] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/account/username");
+        if (res.ok) {
+          const data = await res.json();
+          setUsername(data.username ?? null);
+          setDraft(data.username ?? "");
+        }
+      } catch {
+        // stays unknown; never faked
+      } finally {
+        setLoaded(true);
+      }
+    })();
+  }, []);
+
+  async function save() {
+    const wanted = draft.trim().toLowerCase();
+    if (!wanted || wanted === username) return;
+    setBusy(true);
+    try {
+      const res = await fetch("/api/account/username", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: wanted }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        onToast(data?.error ?? "Could not update the username.");
+        setDraft(username ?? "");
+        return;
+      }
+      setUsername(data.username);
+      setDraft(data.username);
+      onToast(`Username set to @${data.username}. Projects live at /${data.username}/…`);
+    } catch {
+      onToast("Connection failed while saving the username.");
+      setDraft(username ?? "");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-kore-muted">Username</span>
+      {!loaded ? (
+        <span className="font-mono text-xs text-kore-faint">Loading…</span>
+      ) : (
+        <span className="flex min-w-0 items-center justify-end gap-2">
+          <span className="font-mono text-xs text-kore-faint" aria-hidden>@</span>
+          <input
+            value={draft}
+            onChange={(e) =>
+              setDraft(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))
+            }
+            onBlur={save}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+            }}
+            disabled={busy}
+            maxLength={30}
+            spellCheck={false}
+            autoComplete="off"
+            aria-label="Your username"
+            className="w-36 rounded-lg border border-white/10 bg-black/40 px-2.5 py-1.5 font-mono text-xs text-white outline-none transition focus:border-kore-accent/60 disabled:opacity-60"
+          />
+        </span>
+      )}
+    </div>
+  );
 }
 
 function StatusRow({
@@ -228,6 +309,7 @@ export default function SettingsPanel({
                       {email || "—"}
                     </span>
                   </div>
+                  <UsernameRow onToast={onToast} />
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-kore-muted">Daily usage</span>
                     <span className="font-mono text-kore-text">
@@ -237,6 +319,16 @@ export default function SettingsPanel({
                           : `${usage.used} / ${usage.limit} requests`
                         : "Loading…"}
                     </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 pt-1">
+                    <span className="text-kore-muted">More controls</span>
+                    <Link
+                      href="/account"
+                      className="inline-flex items-center gap-1 text-xs font-medium text-kore-accent hover:underline"
+                    >
+                      Open full account area
+                      <ExternalLink className="h-3 w-3" aria-hidden />
+                    </Link>
                   </div>
                 </div>
               </motion.section>

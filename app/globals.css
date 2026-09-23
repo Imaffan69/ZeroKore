@@ -12,7 +12,7 @@ body {
 }
 
 body {
-  background-color: #030304;
+  background-color: #000;
   color: #f4f4f6;
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
     "Helvetica Neue", Arial, sans-serif;
@@ -20,18 +20,18 @@ body {
   overflow-x: hidden;
 }
 
-/* Deep black canvas with a whisper of grey light.
-   No ruling lines anywhere: the old grid backdrop is gone for good. */
+/* Pure-black canvas with a sage-green whisper (Freebuff accent family).
+   Grey is gone: surfaces are black, highlights are sage/mint/white. */
 .kore-ambient {
   background:
     radial-gradient(
       58% 42% at 50% -6%,
-      rgba(255, 255, 255, 0.055),
+      rgba(181, 207, 160, 0.09),
       transparent 68%
     ),
     radial-gradient(
       40% 34% at 86% 8%,
-      rgba(255, 255, 255, 0.025),
+      rgba(74, 222, 128, 0.05),
       transparent 76%
     );
 }
@@ -218,12 +218,12 @@ body {
 
 /* ---- iOS glass-morphism design system (neutral black/white) ---- */
 
-/* Translucent layered surface — iOS glass widget */
+/* Translucent layered surface — iOS glass widget on pure black */
 .glass {
   background: linear-gradient(
     145deg,
-    rgba(38, 38, 42, 0.78),
-    rgba(18, 18, 20, 0.62)
+    rgba(24, 26, 22, 0.8),
+    rgba(5, 5, 5, 0.66)
   );
   backdrop-filter: blur(22px) saturate(160%);
   -webkit-backdrop-filter: blur(22px) saturate(160%);

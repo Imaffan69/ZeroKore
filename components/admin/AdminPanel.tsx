@@ -1,19 +1,21 @@
 "use client";
 
 import { useState } from "react";
-import { BarChart3, Users, MessageSquare, Megaphone, ShieldAlert } from "lucide-react";
+import { BarChart3, Users, MessageSquare, Megaphone, ShieldAlert, Globe } from "lucide-react";
 import { cn } from "@/lib/utils";
 import AdminOverview from "@/components/admin/AdminOverview";
 import AdminUsers from "@/components/admin/AdminUsers";
 import AdminFeedback from "@/components/admin/AdminFeedback";
 import AdminAnnouncements from "@/components/admin/AdminAnnouncements";
 import AdminControl from "@/components/admin/AdminControl";
+import AdminSecurity from "@/components/admin/AdminSecurity";
 
-type Tab = "overview" | "users" | "feedback" | "announcements" | "control";
+type Tab = "overview" | "users" | "security" | "feedback" | "announcements" | "control";
 
 const TABS: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: "overview", label: "Overview", icon: BarChart3 },
   { id: "users", label: "Users", icon: Users },
+  { id: "security", label: "Security & IPs", icon: Globe },
   { id: "feedback", label: "Feedback", icon: MessageSquare },
   { id: "announcements", label: "Announcements", icon: Megaphone },
   { id: "control", label: "Site control", icon: ShieldAlert },
@@ -62,6 +64,7 @@ export default function AdminPanel({ role, isOwner }: { role: string; isOwner: b
       <main className="mx-auto max-w-6xl px-5 pb-16">
         {tab === "overview" && <AdminOverview />}
         {tab === "users" && <AdminUsers isOwner={isOwner} selfRole={role} />}
+        {tab === "security" && <AdminSecurity />}
         {tab === "feedback" && <AdminFeedback />}
         {tab === "announcements" && <AdminAnnouncements />}
         {tab === "control" && <AdminControl isOwner={isOwner} />}
