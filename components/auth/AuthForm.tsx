@@ -12,9 +12,26 @@ import { cn } from "@/lib/utils";
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
+/** Explicit OAuth redirect URL. When unset, falls back to window.location.origin
+ * plus our callback path. Set this in env if your Supabase redirect URL is
+ * different from the page origin (e.g. a custom domain or a specific callback). */
+const SUPABASE_OAUTH_REDIRECT = process.env.NEXT_PUBLIC_SUPABASE_OAUTH_REDIRECT;
+
 /** True when the Supabase client can be constructed at all. */
 function isConfigured(): boolean {
   return !!(SUPABASE_URL && SUPABASE_ANON);
+}
+
+/** Build the OAuth redirect target. If SUPABASE_OAUTH_REDIRECT is set, use it
+ * as-is. Otherwise construct from the current origin + callback path. */
+function oauthRedirectTarget(next: string): string {
+  if (SUPABASE_OAUTH_REDIRECT) {
+    const url = new URL(SUPABASE_OAUTH_REDIRECT);
+    // Append next query param, preserving any existing params on the configured URL.
+    url.searchParams.set("next", next);
+    return url.toString();
+  }
+  return `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
 }
 
 /** Translate raw auth failures into concise, actionable copy. */
@@ -214,7 +231,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
     const supabase = createClient();
     // Always return through our callback so the PKCE code is exchanged
     // server-side before landing on the destination page.
-    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
+    const redirectTo = oauthRedirectTarget(next);
     return supabase.auth.signInWithOAuth({
       provider,
       options: { redirectTo },
