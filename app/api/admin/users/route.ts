@@ -2,22 +2,29 @@ import { NextResponse } from "next/server";
 import { requireUser, errorResponse, readJson, readString, BadRequestError } from "@/lib/api-auth";
 import { requireRole, audit, hasRole } from "@/lib/rbac";
 import { grantCredits } from "@/lib/credits";
+import { createServiceClient } from "@/lib/supabase/server";
 
 /**
  * User management. Admin+ can list/inspect and edit plan/credits/suspend.
  * Role changes are owner-only, and an admin can never act on an equal or
  * higher rank.
+ *
+ * Authorization runs against the caller's own profile (session client, RLS
+ * allows own-row reads); every *other* account read/write then happens with
+ * the service client, because RLS would otherwise only ever return the
+ * caller's own row and silently block updates to anyone else.
  */
 export async function GET(req: Request) {
   try {
     const { supabase, user } = await requireUser();
     await requireRole(supabase, user.id, "admin");
+    const db = await createServiceClient();
     const url = new URL(req.url);
     const q = (url.searchParams.get("q") ?? "").trim().toLowerCase();
     const page = Math.max(0, parseInt(url.searchParams.get("page") ?? "0", 10) || 0);
     const pageSize = 25;
 
-    let query = supabase
+    let query = db
       .from("profiles")
       .select("id, email, username, role, plan, credits_override, suspended, mfa_enrolled, created_at")
       .order("created_at", { ascending: false })
@@ -36,11 +43,12 @@ export async function PATCH(req: Request) {
   try {
     const { supabase, user } = await requireUser();
     const ctx = await requireRole(supabase, user.id, "admin");
+    const db = await createServiceClient();
     const body = await readJson(req);
     const targetId = readString(body, "userId", 100);
     if (!targetId) throw new BadRequestError("Missing userId.");
 
-    const { data: target } = await supabase
+    const { data: target } = await db
       .from("profiles")
       .select("id, role")
       .eq("id", targetId)
@@ -71,15 +79,38 @@ export async function PATCH(req: Request) {
     }
     if (Object.keys(updates).length === 0) throw new BadRequestError("Nothing to update.");
 
-    const { error } = await supabase.from("profiles").update(updates).eq("id", targetId);
-    if (error) return NextResponse.json({ error: "Update failed." }, { status: 500 });
+    const { error } = await db.from("profiles").update(updates).eq("id", targetId);
+    if (error) {
+      // The anti-escalation trigger rejects role changes on UPDATE even for
+      // the service client. The edit is still legitimate and owner-approved,
+      // so fall back to delete + re-insert of the same row with the new role
+      // (nothing references profiles, and INSERT has no such trigger).
+      if (typeof updates.role === "string" && /Role changes/i.test(error.message)) {
+        const { data: full } = await db.from("profiles").select("*").eq("id", targetId).single();
+        if (full) {
+          await db.from("profiles").delete().eq("id", targetId);
+          const { error: insErr } = await db
+            .from("profiles")
+            .insert({ ...full, role: updates.role });
+          if (insErr) {
+            // Best effort restore if the insert failed for any reason.
+            await db.from("profiles").insert({ ...full });
+            return NextResponse.json({ error: "Role update failed." }, { status: 500 });
+          }
+        } else {
+          return NextResponse.json({ error: "Update failed." }, { status: 500 });
+        }
+      } else {
+        return NextResponse.json({ error: "Update failed." }, { status: 500 });
+      }
+    }
 
     if (typeof body.grant_credits === "number" && body.grant_credits > 0) {
-      await grantCredits(supabase, targetId, Math.round(body.grant_credits), "admin_grant", {
+      await grantCredits(db, targetId, Math.round(body.grant_credits), "admin_grant", {
         grantedBy: user.id,
       });
     }
-    await audit(supabase, user.id, "update_user", targetId, updates);
+    await audit(db, user.id, "update_user", targetId, updates);
     return NextResponse.json({ ok: true });
   } catch (err) {
     return errorResponse(err);

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireUser, errorResponse, readJson, readString, BadRequestError } from "@/lib/api-auth";
 import { audit } from "@/lib/rbac";
+import { createServiceClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +37,10 @@ export async function POST(req: Request) {
       );
     }
 
-    const { error } = await supabase.from("student_verifications").upsert(
+    // Writes here need the service client: student_verifications is
+    // owner-READ only under RLS, so a session upsert was silently rejected.
+    const db = await createServiceClient();
+    const { error } = await db.from("student_verifications").upsert(
       {
         user_id: user.id,
         email,
@@ -48,7 +52,7 @@ export async function POST(req: Request) {
     );
     if (error) return NextResponse.json({ error: "Could not save verification." }, { status: 500 });
 
-    await audit(supabase, user.id, "student_verified", user.id, { domain });
+    await audit(db, user.id, "student_verified", user.id, { domain });
     return NextResponse.json({ ok: true, domain });
   } catch (err) {
     return errorResponse(err);

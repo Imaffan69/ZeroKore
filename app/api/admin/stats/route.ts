@@ -1,20 +1,24 @@
 import { NextResponse } from "next/server";
 import { requireUser, errorResponse } from "@/lib/api-auth";
 import { requireRole, audit } from "@/lib/rbac";
+import { createServiceClient } from "@/lib/supabase/server";
 
-/** Site stats for the admin dashboard. Admin+ only. */
+/** Site stats for the admin dashboard. Admin+ only. Cross-account reads
+ *  run with the service client — RLS would only ever return the caller's
+ *  own rows through the session client. */
 export async function GET() {
   try {
     const { supabase, user } = await requireUser();
     await requireRole(supabase, user.id, "admin");
+    const db = await createServiceClient();
 
     const [users, projects, conversations, runs, feedback, credits] = await Promise.all([
-      supabase.from("profiles").select("id, role, created_at", { count: "exact", head: false }).limit(1000),
-      supabase.from("projects").select("id", { count: "exact", head: true }),
-      supabase.from("conversations").select("id", { count: "exact", head: true }),
-      supabase.from("usage_runs").select("prompt_tokens, completion_tokens", { count: "exact", head: false }).limit(5000),
-      supabase.from("feedback").select("id", { count: "exact", head: true }).eq("status", "open"),
-      supabase.from("credits").select("balance").limit(2000),
+      db.from("profiles").select("id, role, created_at", { count: "exact", head: false }).limit(1000),
+      db.from("projects").select("id", { count: "exact", head: true }),
+      db.from("conversations").select("id", { count: "exact", head: true }),
+      db.from("usage_runs").select("prompt_tokens, completion_tokens", { count: "exact", head: false }).limit(5000),
+      db.from("feedback").select("id", { count: "exact", head: true }).eq("status", "open"),
+      db.from("credits").select("balance").limit(2000),
     ]);
 
     const rows = users.data ?? [];
@@ -24,6 +28,7 @@ export async function GET() {
     );
     const creditsOutstanding = (credits.data ?? []).reduce((acc, r) => acc + (r.balance ?? 0), 0);
 
+    await audit(db, user.id, "admin.stats.view");
     return NextResponse.json({
       totalUsers: users.count ?? rows.length,
       staffUsers: rows.filter((r) => r.role === "admin" || r.role === "owner").length,

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireUser, errorResponse, readJson, readString } from "@/lib/api-auth";
 import { encryptSecret, decryptSecret, isEncryptionConfigured } from "@/lib/crypto";
+import { createServiceClient } from "@/lib/supabase/server";
 
 /**
  * BYO AI credentials & integration keys.
@@ -56,7 +57,10 @@ export async function POST(req: Request) {
     if (!PROVIDERS.includes(provider) || apiKey.length < 8) {
       return NextResponse.json({ error: "Choose a provider and paste a valid key." }, { status: 400 });
     }
-    const { error } = await supabase.from("integrations").upsert(
+    // integrations is owner-READ only under RLS — writes must use the
+    // service client (encryption already happened above, server-side).
+    const db = await createServiceClient();
+    const { error } = await db.from("integrations").upsert(
       { user_id: user.id, provider, encrypted_key: encryptSecret(apiKey), label },
       { onConflict: "user_id,provider" }
     );
@@ -75,7 +79,8 @@ export async function DELETE(req: Request) {
     if (!PROVIDERS.includes(provider)) {
       return NextResponse.json({ error: "Unknown provider." }, { status: 400 });
     }
-    await supabase.from("integrations").delete().eq("user_id", user.id).eq("provider", provider);
+    const db = await createServiceClient();
+    await db.from("integrations").delete().eq("user_id", user.id).eq("provider", provider);
     return NextResponse.json({ ok: true });
   } catch (err) {
     return errorResponse(err);

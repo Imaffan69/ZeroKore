@@ -29,6 +29,7 @@ const RESERVED_EXACT = new Set([
   "health", "www", "mail", "email", "smtp", "cdn", "static", "assets", "public",
   "about", "pricing", "terms", "privacy", "legal", "docs", "documentation",
   "blog", "news", "careers", "jobs", "contact", "team", "company", "null",
+  "code", "callback", "oauth",
   "undefined", "none", "anonymous", "guest", "user", "users", "me", "you",
   "test", "testing", "demo", "example", "sample", "staging", "production",
   "internal", "private", "public", "bot", "bots", "agent", "agents", "ai",

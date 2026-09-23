@@ -71,6 +71,12 @@ export default function AuthForm({ mode }: { mode: Mode }) {
     setConfigured(isConfigured());
   }, []);
 
+  // Surface OAuth callback failures (?error=...) as an inline, human message.
+  useEffect(() => {
+    const oauthErr = searchParams.get("error");
+    if (oauthErr) setError(oauthErr);
+  }, [searchParams]);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -206,9 +212,12 @@ export default function AuthForm({ mode }: { mode: Mode }) {
 
   async function supabaseSignIn(provider: "google" | "github") {
     const supabase = createClient();
+    // Always return through our callback so the PKCE code is exchanged
+    // server-side before landing on the destination page.
+    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
     return supabase.auth.signInWithOAuth({
       provider,
-      options: { redirectTo: `${window.location.origin}${next}` },
+      options: { redirectTo },
     });
   }
 

@@ -65,7 +65,10 @@ function describeDevice(ua: string | null): string {
   return `${kind} · ${os} · ${browser}`;
 }
 
-/** Persist an auth event (best-effort; must never break the caller). */
+/** Persist an auth event (best-effort; must never break the caller).
+ *  Runs with the service client: `login_events` has no client write policy,
+ *  so a session-client insert was being silently rejected and history stayed
+ *  empty. The `db` argument is kept for call-site compatibility. */
 export async function logAuthEvent(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   db: import("@supabase/supabase-js").SupabaseClient<any>,
@@ -75,7 +78,9 @@ export async function logAuthEvent(
 ): Promise<void> {
   const info = extractRequestInfo(req);
   try {
-    await db.from("login_events").insert({
+    const { createServiceClient } = await import("@/lib/supabase/server");
+    const svc = await createServiceClient();
+    await svc.from("login_events").insert({
       user_id: userId,
       event,
       ip: info.ip,

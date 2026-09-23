@@ -1,19 +1,22 @@
 import { NextResponse } from "next/server";
 import { requireUser, errorResponse } from "@/lib/api-auth";
 import { requireRole, audit } from "@/lib/rbac";
+import { createServiceClient } from "@/lib/supabase/server";
 
 /**
  * Security analytics for admins: recent auth events across accounts with
  * IP, approximate location (country/city) and device — plus a country
- * histogram. Every call is audited. Admin+ only.
+ * histogram. Every call is audited. Admin+ only. Cross-account reads use
+ * the service client (login_events RLS only exposes the caller's own rows).
  */
 export async function GET() {
   try {
     const { supabase, user } = await requireUser();
     await requireRole(supabase, user.id, "admin");
-    await audit(supabase, user.id, "admin.security.view", "login_events");
+    const db = await createServiceClient();
+    await audit(db, user.id, "admin.security.view", "login_events");
 
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("login_events")
       .select("user_id, event, ip, country, city, user_agent, created_at")
       .order("created_at", { ascending: false })

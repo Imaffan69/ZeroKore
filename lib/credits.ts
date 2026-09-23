@@ -5,6 +5,7 @@ import {
   STUDENT_BONUS,
   type PlanId,
 } from "@/lib/plans";
+import { createServiceClient } from "@/lib/supabase/server";
 
 /**
  * Server-side credits engine.
@@ -13,6 +14,12 @@ import {
  * is compared to today on every read and topped back up when it is stale.
  * Every grant/spend/refund lands in `credit_ledger` so the economy is fully
  * auditable. Admin/owner roles are exempt from spending.
+ *
+ * These tables are RLS-locked (owner READ only, no client write policies) on
+ * purpose — so every operation here runs through a cached *service* client.
+ * Passing the caller's session client used to make every write silently fail:
+ * balances never moved and the ledger stayed empty. Callers may still pass
+ * their session client; it is ignored for platform writes.
  */
 
 export interface CreditState {
@@ -29,7 +36,16 @@ function todayUTC(): string {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Db = SupabaseClient<any>;
 
+let svcPromise: Promise<Db> | null = null;
+async function svc(): Promise<Db> {
+  if (!svcPromise) {
+    svcPromise = createServiceClient() as unknown as Promise<Db>;
+  }
+  return svcPromise;
+}
+
 async function loadProfile(db: Db, userId: string) {
+  db = await svc();
   const { data } = await db
     .from("profiles")
     .select("plan, credits_override, role, suspended")
@@ -45,6 +61,7 @@ async function loadProfile(db: Db, userId: string) {
 
 /** Student bonus only counts while a verification is unexpired. */
 async function studentBonusActive(db: Db, userId: string): Promise<boolean> {
+  db = await svc();
   const { data } = await db
     .from("student_verifications")
     .select("expires_at")
@@ -61,6 +78,7 @@ async function ledger(
   reason: string,
   metadata: Record<string, unknown> = {}
 ): Promise<void> {
+  db = await svc();
   await db.from("credit_ledger").insert({
     user_id: userId,
     delta,
@@ -71,6 +89,7 @@ async function ledger(
 
 /** Lazy daily reset + balance read. Creates the row if missing. */
 export async function getCreditState(db: Db, userId: string): Promise<CreditState> {
+  db = await svc();
   const profile = await loadProfile(db, userId);
   const unlimited = profile.role === "admin" || profile.role === "owner";
   const allowance = dailyCreditsFor(profile.plan, profile.override);
@@ -129,6 +148,7 @@ export async function chargeCredits(
   reason: string,
   metadata: Record<string, unknown> = {}
 ): Promise<number> {
+  db = await svc();
   const { data: row } = await db
     .from("credits")
     .select("balance")
@@ -145,6 +165,7 @@ export async function chargeCredits(
 
 /** Reserve the base cost before an agent run. True cost settled via settleRun(). */
 export async function reserveCredits(db: Db, userId: string, estimated: number): Promise<CreditState> {
+  db = await svc();
   const state = await getCreditState(db, userId);
   if (state.unlimited) return state;
   if (state.balance < estimated) {
@@ -168,6 +189,7 @@ export async function settleRun(
     reserved?: number;
   } = {}
 ): Promise<number> {
+  db = await svc();
   const trueCost = creditsForTokens(promptTokens, completionTokens);
   const net = trueCost - (meta.reserved ?? 1);
   if (net > 0) {
@@ -194,6 +216,7 @@ export async function settleRun(
 
 /** Refund a failed reservation. */
 export async function refundRun(db: Db, userId: string, amount: number): Promise<void> {
+  db = await svc();
   await grantCredits(db, userId, Math.max(0, amount), "refund", { phase: "failure" });
 }
 
@@ -205,6 +228,7 @@ export async function grantCredits(
   reason: string,
   metadata: Record<string, unknown> = {}
 ): Promise<void> {
+  db = await svc();
   const { data: row } = await db
     .from("credits")
     .select("balance")
