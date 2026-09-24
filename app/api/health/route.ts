@@ -3,6 +3,7 @@ import { providerCatalog } from "@/lib/ai/cascade-router";
 import { isEncryptionConfigured } from "@/lib/crypto";
 import { platformReady } from "@/lib/platform";
 import { ownerEmails, adminEmails } from "@/lib/rbac";
+import { isAdminConfigured, listAdminAccounts } from "@/lib/admin-auth";
 
 /**
  * Truthful health/config snapshot. Public (read-only, no secrets):
@@ -19,6 +20,20 @@ export async function GET() {
     !!process.env.GITHUB_CLIENT_ID && !!process.env.GITHUB_CLIENT_SECRET;
   const owners = ownerEmails().length;
   const admins = adminEmails().length;
+
+  // Staff accounts in Supabase are the real access path for the panel (the
+  // owner plus every account they create), so count them too.
+  let accountCount = 0;
+  let accountOwner = false;
+  try {
+    const accounts = await listAdminAccounts();
+    accountCount = accounts.length;
+    accountOwner = accounts.some((a) => a.isOwner);
+  } catch {
+    // table missing until 004 is applied
+  }
+  const staffConfigured =
+    accountCount > 0 || owners + admins > 0 || (await isAdminConfigured());
 
   return NextResponse.json({
     application: "healthy",
@@ -42,8 +57,11 @@ export async function GET() {
     serviceRole: process.env.SUPABASE_SERVICE_ROLE_KEY
       ? "configured"
       : "not configured",
-    // 0 means no OWNER_EMAIL is set, so no account can reach the control panel.
-    staff: owners + admins === 0 ? "not configured" : `${owners} owner, ${admins} admin`,
+    // "not configured" means no owner account exists yet, so /kore/admin
+    // cannot be opened by anyone. Counts only — never addresses or usernames.
+    staff: !staffConfigured
+      ? "not configured"
+      : `${accountCount || owners + admins} staff account(s)${accountOwner || owners ? ", owner present" : ""}`,
     // IP + approximate location are recorded on auth events and shown to staff.
     requestLogging: "ip, approximate location, device — disclosed in /privacy",
     timestamp: new Date().toISOString(),
