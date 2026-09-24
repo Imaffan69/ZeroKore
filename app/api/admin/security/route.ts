@@ -1,20 +1,24 @@
 import { NextResponse } from "next/server";
-import { requireUser, errorResponse } from "@/lib/api-auth";
-import { requireRole, audit } from "@/lib/rbac";
-import { createServiceClient } from "@/lib/supabase/server";
+import { requireStaff, adminError } from "@/lib/admin-guard";
 
 /**
  * Security analytics for admins: recent auth events across accounts with
  * IP, approximate location (country/city) and device — plus a country
- * histogram. Every call is audited. Admin+ only. Cross-account reads use
- * the service client (login_events RLS only exposes the caller's own rows).
+ * histogram. Admin+ only, and every call is audited.
  */
 export async function GET() {
   try {
-    const { supabase, user } = await requireUser();
-    await requireRole(supabase, user.id, "admin", user.email);
-    const db = await createServiceClient();
-    await audit(db, user.id, "admin.security.view", "login_events");
+    const actor = await requireStaff("admin");
+    const db = actor.db;
+    try {
+      await db.from("admin_audit").insert({
+        actor_id: actor.userId,
+        actor_label: actor.username,
+        action: "admin.security.view",
+      });
+    } catch {
+      // audit is best effort
+    }
 
     const { data, error } = await db
       .from("login_events")
@@ -39,6 +43,6 @@ export async function GET() {
       total: rows.length,
     });
   } catch (err) {
-    return errorResponse(err);
+    return adminError(err);
   }
 }

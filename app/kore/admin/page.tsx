@@ -23,19 +23,26 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function KoreAdminPage() {
-  // Admin password session takes precedence if configured
+  // Staff account (username + password) takes precedence when configured.
   const adminSession = await getAdminSession();
   if (adminSession.authenticated) {
-    return <AdminPanel role="admin" isOwner={false} adminAuth adminUsername={adminSession.username} />;
+    return (
+      <AdminPanel
+        role={adminSession.role}
+        isOwner={adminSession.isOwner}
+        adminUsername={adminSession.username}
+      />
+    );
   }
 
-  // If DB or env admin credentials are configured, show the login page
+  // If any admin credential exists, show the login form rather than a 404 so
+  // staff can sign in (still invisible: nothing links here).
   const dbConfigured = await isAdminConfigured();
   if (dbConfigured) {
-    return <AdminPanel role="admin" isOwner={false} adminAuth showLogin />;
+    return <AdminPanel role="user" isOwner={false} showLogin />;
   }
 
-  // Otherwise fall back to Supabase staff auth
+  // Otherwise fall back to Supabase staff auth.
   const user = await getSession();
   if (!user) notFound();
 
@@ -43,5 +50,5 @@ export default async function KoreAdminPage() {
   const rbac = await getRbac(supabase, user.id, user.email);
   if (!rbac.isStaff) notFound();
 
-  return <AdminPanel role={rbac.role} isOwner={rbac.isOwner} />;
+  return <AdminPanel role={rbac.role} isOwner={rbac.isOwner} adminUsername={user.email ?? undefined} />;
 }

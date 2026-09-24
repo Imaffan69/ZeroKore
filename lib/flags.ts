@@ -81,7 +81,9 @@ export async function getMaintenanceFlag(db: Db): Promise<MaintenanceFlag> {
 
 export async function setMaintenanceFlag(
   db: Db,
-  updatedBy: string,
+  // Staff who sign in with a username + password have no profile id, so this
+  // is nullable rather than forcing a fake uuid.
+  updatedBy: string | null,
   flag: MaintenanceFlag
 ): Promise<void> {
   await db.from("site_flags").upsert(

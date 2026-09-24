@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { BarChart3, Users, MessageSquare, Megaphone, ShieldAlert, Globe, LogOut } from "lucide-react";
+import { useState, useCallback } from "react";
+import { BarChart3, Users, MessageSquare, Megaphone, ShieldAlert, Globe, LogOut, UserCog } from "lucide-react";
 import { cn } from "@/lib/utils";
 import AdminOverview from "@/components/admin/AdminOverview";
 import AdminUsers from "@/components/admin/AdminUsers";
@@ -9,9 +9,10 @@ import AdminFeedback from "@/components/admin/AdminFeedback";
 import AdminAnnouncements from "@/components/admin/AdminAnnouncements";
 import AdminControl from "@/components/admin/AdminControl";
 import AdminSecurity from "@/components/admin/AdminSecurity";
+import AdminStaff from "@/components/admin/AdminStaff";
 import AdminLoginForm from "@/components/admin/AdminLoginForm";
 
-type Tab = "overview" | "users" | "security" | "feedback" | "announcements" | "control";
+type Tab = "overview" | "users" | "security" | "feedback" | "announcements" | "staff" | "control";
 
 /**
  * Each tab declares the minimum staff rank that may open it. The matching API
@@ -25,7 +26,7 @@ const TABS: {
   id: Tab;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
-  min: "viewer" | "moderator" | "admin";
+  min: "viewer" | "moderator" | "admin" | "owner";
 }[] = [
   { id: "overview", label: "Overview", icon: BarChart3, min: "viewer" },
   { id: "feedback", label: "Feedback", icon: MessageSquare, min: "moderator" },
@@ -33,6 +34,7 @@ const TABS: {
   { id: "users", label: "Users", icon: Users, min: "admin" },
   { id: "security", label: "Security & IPs", icon: Globe, min: "admin" },
   { id: "control", label: "Site control", icon: ShieldAlert, min: "admin" },
+  { id: "staff", label: "Staff accounts", icon: UserCog, min: "owner" },
 ];
 
 const RANK: Record<string, number> = {
@@ -44,32 +46,35 @@ const RANK: Record<string, number> = {
   owner: 5,
 };
 
-export default function AdminPanel({ role, isOwner, adminAuth, showLogin, adminUsername }: { role: string; isOwner: boolean; adminAuth?: boolean; showLogin?: boolean; adminUsername?: string }) {
-  const effectiveRole = adminAuth ? "admin" : role;
+export default function AdminPanel({
+  role,
+  isOwner,
+  showLogin,
+  adminUsername,
+}: {
+  role: string;
+  isOwner: boolean;
+  showLogin?: boolean;
+  adminUsername?: string;
+}) {
+  const effectiveRole = role;
   const rank = RANK[effectiveRole] ?? 0;
   const allowed = TABS.filter((t) => rank >= (RANK[t.min] ?? 99));
   const [tab, setTab] = useState<Tab>(allowed[0]?.id ?? "overview");
   const activeTab = allowed.some((t) => t.id === tab) ? tab : (allowed[0]?.id ?? "overview");
 
-  const [adminUsernameState, setAdminUsernameState] = useState<string | null>(null);
-  useEffect(() => {
-    if (!adminAuth) return;
-    fetch("/api/admin/identity")
-      .then((r) => r.json())
-      .then((d) => setAdminUsernameState(d.username || null))
-      .catch(() => {});
-  }, [adminAuth]);
-
-  // Logout handler for admin password session
-  const handleLogout = useCallback(() => {
-    fetch("/kore/admin/logout", { method: "POST" }).then(() => {
-      window.location.href = "/kore/admin/login";
-    });
+  // Sign-out must work for both credential types: the staff account cookie and
+  // a Supabase staff session.
+  const handleLogout = useCallback(async () => {
+    try {
+      await fetch("/kore/admin/logout", { method: "POST" });
+    } catch {
+      // ignore — the redirect below still happens
+    }
+    window.location.replace("/kore");
   }, []);
 
-  // When admin password auth is configured but user isn't logged in yet,
-  // show only the login form — no header, no nav, no tabs.
-  if (adminAuth && showLogin) {
+  if (showLogin) {
     return (
       <div className="min-h-screen bg-black px-5 py-16">
         <div className="mx-auto max-w-md">
@@ -89,31 +94,22 @@ export default function AdminPanel({ role, isOwner, adminAuth, showLogin, adminU
               ZeroKore <span className="text-kore-accent">control</span>
             </h1>
             <p className="text-xs text-kore-muted">
-              {adminAuth ? (
-                <>
-                  Admin: <span className="text-kore-accent">{adminUsernameState || adminUsername}</span>
-                  {" · "}
-                  <span className="text-kore-faint">signed in via password</span>
-                </>
-              ) : (
-                <>
-                  Signed in as{" "}
-                  <span className="text-kore-accent">{effectiveRole}</span>
-                  {isOwner ? " · full authority" : ""}
-                </>
-              )}
+              Signed in as{" "}
+              <span className="font-mono text-kore-accent">
+                {adminUsername ?? effectiveRole}
+              </span>{" "}
+              · <span className="text-kore-faint">{effectiveRole}</span>
+              {isOwner ? " · full authority" : ""}
             </p>
           </div>
           <div className="flex items-center gap-2">
-            {adminAuth && (
-              <button
-                onClick={handleLogout}
-                className="inline-flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1 text-xs text-kore-muted transition hover:bg-white/5 hover:text-white"
-              >
-                <LogOut className="h-3 w-3" aria-hidden />
-                Sign out
-              </button>
-            )}
+            <button
+              onClick={handleLogout}
+              className="inline-flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1 text-xs text-kore-muted transition hover:bg-white/5 hover:text-white"
+            >
+              <LogOut className="h-3 w-3" aria-hidden />
+              Sign out
+            </button>
             <span className="rounded-full border border-white/10 px-3 py-1 text-xs text-kore-muted">
               unlisted · do not share
             </span>
@@ -146,6 +142,7 @@ export default function AdminPanel({ role, isOwner, adminAuth, showLogin, adminU
         {activeTab === "feedback" && <AdminFeedback />}
         {activeTab === "announcements" && <AdminAnnouncements />}
         {activeTab === "control" && <AdminControl isOwner={isOwner} />}
+        {activeTab === "staff" && <AdminStaff />}
       </main>
     </div>
   );

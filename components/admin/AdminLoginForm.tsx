@@ -140,10 +140,8 @@ export default function AdminLoginForm() {
           </div>
 
           <p className="mt-4 text-[11px] text-kore-faint leading-relaxed">
-            Admin auth is protected by{" "}
-            <span className="font-mono">ADMIN_USERNAME</span> and{" "}
-            <span className="font-mono">ADMIN_PASSWORD_HASH</span>
-            set on the server. The password is hashed — it never leaves the server.
+            Staff accounts are created by the site owner and authenticate with a username and
+            password. The password is hashed on the server and never stored in plain text.
           </p>
         </form>
       </motion.div>

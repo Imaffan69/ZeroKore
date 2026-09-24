@@ -1,16 +1,13 @@
 import { NextResponse } from "next/server";
-import { requireUser, errorResponse } from "@/lib/api-auth";
-import { requireRole, audit } from "@/lib/rbac";
-import { createServiceClient } from "@/lib/supabase/server";
+import { requireStaff, adminError } from "@/lib/admin-guard";
 
 /** Site stats for the admin dashboard. Admin+ only. Cross-account reads
  *  run with the service client — RLS would only ever return the caller's
  *  own rows through the session client. */
 export async function GET() {
   try {
-    const { supabase, user } = await requireUser();
-    await requireRole(supabase, user.id, "viewer", user.email);
-    const db = await createServiceClient();
+    const actor = await requireStaff("viewer");
+    const db = actor.db;
 
     const [users, projects, conversations, runs, feedback, credits] = await Promise.all([
       db.from("profiles").select("id, role, created_at", { count: "exact", head: false }).limit(1000),
@@ -28,7 +25,15 @@ export async function GET() {
     );
     const creditsOutstanding = (credits.data ?? []).reduce((acc, r) => acc + (r.balance ?? 0), 0);
 
-    await audit(db, user.id, "admin.stats.view");
+    try {
+      await db.from("admin_audit").insert({
+        actor_id: actor.userId,
+        actor_label: actor.username,
+        action: "admin.stats.view",
+      });
+    } catch {
+      // audit is best effort
+    }
     return NextResponse.json({
       totalUsers: users.count ?? rows.length,
       staffUsers: rows.filter((r) => r.role === "admin" || r.role === "owner").length,
@@ -41,7 +46,7 @@ export async function GET() {
       signupsByDay: groupByDay(rows.map((r) => r.created_at)),
     });
   } catch (err) {
-    return errorResponse(err);
+    return adminError(err);
   }
 }
 

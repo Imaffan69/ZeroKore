@@ -1,14 +1,12 @@
 import { NextResponse } from "next/server";
-import { requireUser, errorResponse, readJson, readString, BadRequestError } from "@/lib/api-auth";
-import { requireRole, audit } from "@/lib/rbac";
-import { createServiceClient } from "@/lib/supabase/server";
+import { readJson, readString, BadRequestError } from "@/lib/api-auth";
+import { requireStaff, adminError } from "@/lib/admin-guard";
 
 /** Feedback inbox: moderator+ read (support and up see it), moderator+ can change status. */
 export async function GET(req: Request) {
   try {
-    const { supabase, user } = await requireUser();
-    await requireRole(supabase, user.id, "moderator", user.email);
-    const db = await createServiceClient();
+    const actor = await requireStaff("moderator");
+    const db = actor.db;
     const url = new URL(req.url);
     const status = url.searchParams.get("status");
     let query = db
@@ -38,15 +36,14 @@ export async function GET(req: Request) {
     }));
     return NextResponse.json({ feedback: enriched });
   } catch (err) {
-    return errorResponse(err);
+    return adminError(err);
   }
 }
 
 export async function PATCH(req: Request) {
   try {
-    const { supabase, user } = await requireUser();
-    await requireRole(supabase, user.id, "moderator", user.email);
-    const db = await createServiceClient();
+    const actor = await requireStaff("moderator");
+    const db = actor.db;
     const body = await readJson(req);
     const id = readString(body, "id", 100);
     const status = readString(body, "status", 20);
@@ -55,9 +52,18 @@ export async function PATCH(req: Request) {
     }
     const { error } = await db.from("feedback").update({ status }).eq("id", id);
     if (error) return NextResponse.json({ error: "Update failed." }, { status: 500 });
-    await audit(db, user.id, "feedback_status", null, { id, status });
+    try {
+      await db.from("admin_audit").insert({
+        actor_id: actor.userId,
+        actor_label: actor.username,
+        action: "feedback_status",
+        detail: { id, status },
+      });
+    } catch {
+      // best effort
+    }
     return NextResponse.json({ ok: true });
   } catch (err) {
-    return errorResponse(err);
+    return adminError(err);
   }
 }

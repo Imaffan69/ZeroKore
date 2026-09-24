@@ -1,24 +1,22 @@
 import { NextResponse } from "next/server";
-import { requireUser, errorResponse, readJson, readString, BadRequestError } from "@/lib/api-auth";
-import { requireRole, audit, hasRole } from "@/lib/rbac";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { readJson, readString, BadRequestError } from "@/lib/api-auth";
+import { requireStaff, adminError, type AdminContext } from "@/lib/admin-guard";
+import { hasRole } from "@/lib/rbac";
 import { grantCredits } from "@/lib/credits";
-import { createServiceClient } from "@/lib/supabase/server";
 
 /**
  * User management. Admin+ can list/inspect and edit plan/credits/suspend.
  * Role changes are owner-only, and an admin can never act on an equal or
  * higher rank.
  *
- * Authorization runs against the caller's own profile (session client, RLS
- * allows own-row reads); every *other* account read/write then happens with
- * the service client, because RLS would otherwise only ever return the
- * caller's own row and silently block updates to anyone else.
+ * Reads and writes run with the service client from the admin guard: RLS would
+ * otherwise only ever return the caller's own row and silently block updates.
  */
 export async function GET(req: Request) {
   try {
-    const { supabase, user } = await requireUser();
-    await requireRole(supabase, user.id, "admin", user.email);
-    const db = await createServiceClient();
+    const actor = await requireStaff("admin");
+    const db = actor.db;
     const url = new URL(req.url);
     const q = (url.searchParams.get("q") ?? "").trim().toLowerCase();
     const page = Math.max(0, parseInt(url.searchParams.get("page") ?? "0", 10) || 0);
@@ -35,77 +33,100 @@ export async function GET(req: Request) {
     if (error) return NextResponse.json({ error: "Could not load users." }, { status: 500 });
     return NextResponse.json({ users: data ?? [], page, pageSize });
   } catch (err) {
-    return errorResponse(err);
+    return adminError(err);
   }
 }
 
 export async function PATCH(req: Request) {
   try {
-    const { supabase, user } = await requireUser();
-    const ctx = await requireRole(supabase, user.id, "admin", user.email);
-    const db = await createServiceClient();
-    const body = await readJson(req);
-    const targetId = readString(body, "userId", 100);
-    if (!targetId) throw new BadRequestError("Missing userId.");
-
-    const { data: target } = await db
-      .from("profiles")
-      .select("id, role")
-      .eq("id", targetId)
-      .maybeSingle();
-    if (!target) throw new BadRequestError("User not found.");
-    // No acting on equal/higher rank (owner can act on anyone except self).
-    if (!ctx.isOwner && hasRole(target.role, "admin")) {
-      throw new BadRequestError("Only the owner can modify staff accounts.");
-    }
-    if (targetId === user.id && body.suspended === true) {
-      throw new BadRequestError("You cannot suspend yourself.");
-    }
-
-    const updates: Record<string, unknown> = {};
-    if (typeof body.plan === "string" && ["free", "plus", "pro", "max", "team", "student"].includes(body.plan)) {
-      updates.plan = body.plan;
-    }
-    if (typeof body.credits_override === "number" && body.credits_override >= 0) {
-      updates.credits_override = Math.round(body.credits_override);
-    }
-    if (typeof body.suspended === "boolean") updates.suspended = body.suspended;
-    if (typeof body.role === "string") {
-      if (!ctx.isOwner) throw new BadRequestError("Only the owner can change roles.");
-      if (!["user", "viewer", "support", "moderator", "admin"].includes(body.role)) {
-        throw new BadRequestError("Invalid role.");
-      }
-      updates.role = body.role;
-    }
-    if (Object.keys(updates).length === 0) throw new BadRequestError("Nothing to update.");
-
-    const { error } = await db.from("profiles").update(updates).eq("id", targetId);
-    if (error) {
-      // Migration 002 narrows the anti-escalation trigger to *self* changes, so
-      // a service-role role update succeeds normally. If we still see the old
-      // blanket rejection, the migration has not been applied yet — say so
-      // instead of guessing, because the only other way to force a role was
-      // deleting and re-inserting the row (which risks cascading user data).
-      if (typeof updates.role === "string" && /Role changes/i.test(error.message)) {
-        return NextResponse.json(
-          {
-            error:
-              "Role changes are blocked by the database. Run supabase/migrations/002_role_guard.sql, then retry.",
-          },
-          { status: 409 }
-        );
-      }
-      return NextResponse.json({ error: "Update failed." }, { status: 500 });
-    }
-
-    if (typeof body.grant_credits === "number" && body.grant_credits > 0) {
-      await grantCredits(db, targetId, Math.round(body.grant_credits), "admin_grant", {
-        grantedBy: user.id,
-      });
-    }
-    await audit(db, user.id, "update_user", targetId, updates);
+    const actor = await requireStaff("admin");
+    await applyUserUpdate(actor, req);
     return NextResponse.json({ ok: true });
   } catch (err) {
-    return errorResponse(err);
+    return adminError(err);
   }
 }
+
+async function applyUserUpdate(actor: AdminContext, req: Request) {
+  const db = actor.db;
+  const body = await readJson(req);
+  const targetId = readString(body, "userId", 100);
+  if (!targetId) throw new BadRequestError("Missing userId.");
+
+  const { data: target } = await db
+    .from("profiles")
+    .select("id, role")
+    .eq("id", targetId)
+    .maybeSingle();
+  if (!target) throw new BadRequestError("User not found.");
+  // No acting on equal/higher rank (owner can act on anyone except self).
+  if (!actor.isOwner && hasRole(target.role, "admin")) {
+    throw new BadRequestError("Only the owner can modify staff accounts.");
+  }
+  if (targetId === actor.userId && body.suspended === true) {
+    throw new BadRequestError("You cannot suspend yourself.");
+  }
+
+  const updates: Record<string, unknown> = {};
+  if (
+    typeof body.plan === "string" &&
+    ["free", "plus", "pro", "max", "team", "student"].includes(body.plan)
+  ) {
+    updates.plan = body.plan;
+  }
+  if (typeof body.credits_override === "number" && body.credits_override >= 0) {
+    updates.credits_override = Math.round(body.credits_override);
+  }
+  if (typeof body.suspended === "boolean") updates.suspended = body.suspended;
+  if (typeof body.role === "string") {
+    if (!actor.isOwner) throw new BadRequestError("Only the owner can change roles.");
+    if (!["user", "viewer", "support", "moderator", "admin"].includes(body.role)) {
+      throw new BadRequestError("Invalid role.");
+    }
+    updates.role = body.role;
+  }
+  if (Object.keys(updates).length === 0) throw new BadRequestError("Nothing to update.");
+
+  const { error } = await db.from("profiles").update(updates).eq("id", targetId);
+  if (error) {
+    // Migration 002 narrows the anti-escalation trigger to *self* changes, so
+    // a service-role role update succeeds normally. If we still see the old
+    // blanket rejection, the migration has not been applied yet.
+    if (typeof updates.role === "string" && /Role changes/i.test(error.message)) {
+      throw new BadRequestError(
+        "Role changes are blocked by the database. Run supabase/migrations/002_role_guard.sql, then retry."
+      );
+    }
+    throw new Error("Update failed.");
+  }
+
+  if (typeof body.grant_credits === "number" && body.grant_credits > 0) {
+    await grantCredits(db, targetId, Math.round(body.grant_credits), "admin_grant", {
+      grantedBy: actor.userId ?? actor.username,
+    });
+  }
+  await auditAction(db, actor, "update_user", targetId, updates);
+}
+
+/** Audit helper — kept module-private (route files may only export handlers). */
+async function auditAction(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  db: SupabaseClient<any>,
+  actor: AdminContext,
+  action: string,
+  targetUserId: string | null = null,
+  detail: Record<string, unknown> = {}
+): Promise<void> {
+  try {
+    await db.from("admin_audit").insert({
+      actor_id: actor.userId,
+      actor_label: actor.username,
+      action,
+      target_user_id: targetUserId,
+      detail,
+    });
+  } catch {
+    // audit failures must never mask the operation result
+  }
+}
+

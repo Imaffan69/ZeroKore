@@ -21,13 +21,29 @@ export default function AdminUsers({ isOwner, selfRole }: { isOwner: boolean; se
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [legendOpen, setLegendOpen] = useState(false);
 
   const load = useCallback(async (query: string) => {
     setLoading(true);
-    const res = await fetch(`/api/admin/users?q=${encodeURIComponent(query)}`);
-    if (res.ok) setUsers((await res.json()).users);
-    setLoading(false);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/users?q=${encodeURIComponent(query)}`);
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        // Surface the real reason instead of an empty list that reads as
+        // "no users exist".
+        setUsers([]);
+        setError((json.error as string) ?? `Request failed (${res.status}).`);
+        return;
+      }
+      setUsers(Array.isArray(json.users) ? json.users : []);
+    } catch {
+      setUsers([]);
+      setError("Could not reach the server. Check your connection and reload.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -101,9 +117,14 @@ export default function AdminUsers({ isOwner, selfRole }: { isOwner: boolean; se
       </form>
 
       {message && <p className="text-xs text-kore-accent">{message}</p>}
+      {error && (
+        <p className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+          {error}
+        </p>
+      )}
       {loading ? (
         <Loader2 className="mx-auto mt-10 h-6 w-6 animate-spin text-kore-muted" />
-      ) : users.length === 0 ? (
+      ) : users.length === 0 && !error ? (
         <p className="text-sm text-kore-muted">No users found.</p>
       ) : (
         users.map((u) => (
