@@ -40,6 +40,29 @@ export default function ImportRepoPanel({
   const [selected, setSelected] = useState<GitHubRepo | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [connected, setConnected] = useState<string | null>(null);
+
+  // Coming back from GitHub: the OAuth callback returns here with
+  // ?github=connected&github_login=… (or ?github_error=…). Show the result and
+  // refresh the list so the repositories are actually there, rather than
+  // silently landing on an empty picker.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const status = params.get("github");
+    const login = params.get("github_login");
+    const ghError = params.get("github_error");
+    if (status === "connected") {
+      setConnected(login || "your GitHub account");
+      router.replace(window.location.pathname);
+    } else if (ghError) {
+      setError(ghError);
+      router.replace(window.location.pathname);
+    }
+  }, [router]);
+
+  // Where to return after authorising, so the user comes back to this panel.
+  const returnTo = typeof window === "undefined" ? "/dashboard" : window.location.pathname;
+  const connectHref = `/api/github/oauth?next=${encodeURIComponent(returnTo)}`;
 
   const load = useCallback(async () => {
     setNote(null);
@@ -142,12 +165,22 @@ export default function ImportRepoPanel({
         </p>
       )}
 
-      {gh?.configured && !gh.connected && (
+      {connected && (
+        <p className="mt-3 flex items-start gap-2 rounded-xl border border-emerald-400/30 bg-emerald-400/10 px-3 py-2.5 text-xs leading-relaxed text-emerald-200">
+          <Check className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+          <span>
+            Connected as <span className="font-mono">{connected}</span>. Your
+            repositories are listed below — pick one to import.
+          </span>
+        </p>
+      )}
+
+      {gh?.configured && !gh.connected && !connected && (
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <motion.a
             whileHover={{ translateY: -1 }}
             whileTap={press}
-            href="/api/github/oauth"
+            href={connectHref}
             className="inline-flex items-center gap-2 rounded-full bg-white px-3.5 py-1.5 text-xs font-semibold text-black transition hover:bg-white/85"
           >
             <Github className="h-3.5 w-3.5" aria-hidden />

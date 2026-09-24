@@ -34,7 +34,9 @@ export async function GET(req: Request) {
   if (code) {
     try {
       const supabase = await createClient();
-      const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+      const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(
+        code
+      );
       if (exchangeError) {
         return NextResponse.redirect(
           new URL(
@@ -43,6 +45,22 @@ export async function GET(req: Request) {
             )}`,
             origin
           )
+        );
+      }
+      // Record the sign-in with IP, approximate location and device. Without
+      // this the Security tab stayed empty, because OAuth sign-ins are the one
+      // path that never passed through a logged event.
+      const user = data?.user;
+      if (user) {
+        const { logActivity } = await import("@/lib/request-info");
+        // A brand-new account is a signup; a returning one is a login.
+        const createdAt = user.created_at ? new Date(user.created_at).getTime() : 0;
+        const isNew = createdAt > 0 && Date.now() - createdAt < 5 * 60 * 1000;
+        await logActivity(
+          user.id,
+          isNew ? "signup" : "login",
+          req,
+          isNew ? {} : { provider: "oauth" }
         );
       }
     } catch {

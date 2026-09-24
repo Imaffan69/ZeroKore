@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
   title: "Blog — ZeroKore",
@@ -72,7 +72,12 @@ interface Announcement {
 export default async function BlogPage() {
   let announcements: Announcement[] = [];
   try {
-    const supabase = await createClient();
+    // RLS on `announcements` intentionally exposes no policy to anon or
+    // authenticated clients, so the session client returned nothing here and
+    // every admin post stayed invisible on the public blog. The service client
+    // reads only `active = true` rows, which is all a public page may show —
+    // drafts and inactive announcements still never leak.
+    const supabase = await createServiceClient();
     const { data } = await supabase
       .from("announcements")
       .select("id, title, body, version, created_at")

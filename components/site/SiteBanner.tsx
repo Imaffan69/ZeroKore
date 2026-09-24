@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Megaphone, Rocket, Wrench } from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/server";
 
 interface Banner {
   id: string;
@@ -24,7 +24,11 @@ export default async function SiteBanner() {
   let banner: Banner | null = null;
 
   try {
-    const supabase = await createClient();
+    // `announcements` has RLS with no public policy, so the session client
+    // returned zero rows and staff-published banners never appeared on the site.
+    // The service client is used only to read `active = true` rows, which is
+    // exactly the public subset — drafts and inactive posts stay hidden.
+    const supabase = await createServiceClient();
     const { data } = await supabase
       .from("announcements")
       .select("id, kind, title, body, version")

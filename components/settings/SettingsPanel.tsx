@@ -670,33 +670,9 @@ export default function SettingsPanel({
                 )}
               </motion.section>
 
-              {health?.staff && health.staff !== "not configured" && (
-                <motion.section
-                  variants={fadeUp}
-                  className="glass glass-sheen rounded-2xl p-5"
-                >
-                  <div className="mb-2 flex items-center gap-2">
-                    <ShieldCheck className="h-4 w-4 text-kore-accent" aria-hidden />
-                    <h3 className="font-semibold text-white">Admin panel</h3>
-                  </div>
-                  <p className="text-sm text-kore-muted">
-                    Staff access is configured ({health.staff}). The hidden control
-                    panel is at{" "}
-                    <span className="font-mono text-kore-accent">/kore/admin</span>.
-                  </p>
-                  <Link
-                    href="/kore/admin"
-                    className="mt-3 inline-flex items-center gap-2 rounded-full bg-kore-accent/10 px-4 py-2 text-sm font-semibold text-kore-accent transition hover:bg-kore-accent/20"
-                  >
-                    Open admin panel
-                    <ShieldCheck className="h-3.5 w-3.5" aria-hidden />
-                  </Link>
-                  <p className="mt-3 text-xs leading-relaxed text-kore-muted">
-                    The panel is hidden from everyone else. Only accounts with the
-                    staff rank see it: owner, admin and authorised staff.
-                  </p>
-                </motion.section>
-              )}
+              {/* Staff entry point. Rendered only for authorised staff — an
+                  ordinary account learns nothing about the control panel, and
+                  the health snapshot no longer advertises it to everyone. */}
 
               <motion.section
                 variants={fadeUp}

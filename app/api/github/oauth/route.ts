@@ -23,9 +23,43 @@ function redirectUri(req: NextRequest): string {
 
 function backWithError(req: NextRequest, message: string): NextResponse {
   const url = new URL(req.url);
-  const target = new URL("/dashboard", url.origin);
+  const target = new URL(safeReturn(url.searchParams.get("next")), url.origin);
   target.searchParams.set("github_error", message);
   return NextResponse.redirect(target);
+}
+
+/** Only same-origin, absolute paths are accepted as a return target. */
+function safeReturn(raw: string | null): string {
+  if (raw && raw.startsWith("/") && !raw.startsWith("//") && !raw.startsWith("/\\")) {
+    return raw;
+  }
+  return "/dashboard";
+}
+
+/**
+ * `state` binds the callback to the user who started the flow (CSRF
+ * protection) and carries where to return. It is a URL-encoded JSON envelope
+ * rather than a bare user id, because the return path has to survive the
+ * round-trip through GitHub.
+ */
+function encodeState(userId: string, next: string | null): string {
+  return Buffer.from(
+    JSON.stringify({ u: userId, n: safeReturn(next) }),
+    "utf8"
+  ).toString("base64url");
+}
+
+function decodeState(raw: string | null): { u: string; n: string } | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(
+      Buffer.from(raw, "base64url").toString("utf8")
+    ) as { u?: unknown; n?: unknown };
+    if (typeof parsed.u !== "string" || !parsed.u) return null;
+    return { u: parsed.u, n: safeReturn(typeof parsed.n === "string" ? parsed.n : null) };
+  } catch {
+    return null;
+  }
 }
 
 export async function GET(req: NextRequest) {
@@ -61,7 +95,11 @@ export async function GET(req: NextRequest) {
     authorize.searchParams.set("client_id", clientId);
     authorize.searchParams.set("redirect_uri", redirectUri(req));
     authorize.searchParams.set("scope", SCOPE);
-    authorize.searchParams.set("state", user.id); // Simple CSRF binding to the session user.
+    // CSRF binding to the session user, plus the page to come back to.
+    authorize.searchParams.set(
+      "state",
+      encodeState(user.id, url.searchParams.get("next"))
+    );
     return NextResponse.redirect(authorize.toString());
   }
 
@@ -125,8 +163,30 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const target = new URL("/dashboard", url.origin);
-    target.searchParams.set("github_connected", ghLogin);
+    // Record the sync with IP/geo/device like every other activity.
+    try {
+      const { logActivity } = await import("@/lib/request-info");
+      await logActivity(user.id, "github_sync", req, { login: ghLogin, action: "connect" });
+    } catch {
+      // telemetry must never break the connection
+    }
+
+    // Return to wherever the user started the flow. Connecting used to always
+    // land on /dashboard, which threw away the import panel they had open and
+    // left them with an empty repository list and no confirmation.
+    const state = decodeState(url.searchParams.get("state"));
+    // The token must land on the account that authorised it; a mismatched
+    // state means the callback belongs to someone else's flow.
+    if (state && state.u !== user.id) {
+      return backWithError(
+        req,
+        "This GitHub connection belongs to a different sign-in. Start again from your account."
+      );
+    }
+    const safeNext = state?.n ?? safeReturn(url.searchParams.get("next"));
+    const target = new URL(safeNext, url.origin);
+    target.searchParams.set("github", "connected");
+    target.searchParams.set("github_login", ghLogin);
     return NextResponse.redirect(target.toString());
   } catch {
     return backWithError(

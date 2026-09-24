@@ -40,7 +40,9 @@ export async function GET(req: Request) {
   if (code) {
     try {
       const supabase = await createClient();
-      const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+      const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(
+        code
+      );
       if (exchangeError) {
         const response = NextResponse.redirect(
           new URL(
@@ -52,6 +54,16 @@ export async function GET(req: Request) {
         );
         response.headers.set("Cache-Control", NO_CACHE["Cache-Control"]);
         return response;
+      }
+      // Record the sign-in (IP · approximate location · device). This route is
+      // where many OAuth flows actually land, so without it the Security tab
+      // stayed empty even though people were signing in.
+      const user = data?.user;
+      if (user) {
+        const { logActivity } = await import("@/lib/request-info");
+        const createdAt = user.created_at ? new Date(user.created_at).getTime() : 0;
+        const isNew = createdAt > 0 && Date.now() - createdAt < 5 * 60 * 1000;
+        await logActivity(user.id, isNew ? "signup" : "login", req);
       }
     } catch {
       const response = NextResponse.redirect(
