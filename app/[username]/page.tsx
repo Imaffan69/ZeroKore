@@ -16,17 +16,22 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 /**
  * A person's workspace: everything they own, at their own address.
  *
- * The named account is resolved server-side, but the contents are only rendered
- * for the owner. Someone else's namespace gets a plain "this is private" card —
- * the same response whether the account exists or not, so the page cannot be
- * used to discover which usernames are taken.
+ * Order matters. The account is resolved *first* so a visitor who guessed a
+ * username that does not exist gets the same ordinary 404 as any other missing
+ * page — the response cannot be used to discover which usernames are taken.
+ * Only once the account is known to exist do we require a session, and only the
+ * owner ever sees the contents; anyone else gets a plain "this is private" card.
  */
 export default async function UserWorkspacePage({ params }: Params) {
   const { username } = await params;
-  const user = await requireSession(`/${username}`);
 
   const owner = await resolveUsername(username);
   if (!owner) notFound();
+
+  // Named routes (/login, /pricing, /dashboard) are matched before this
+  // segment, so reaching here with a session means the caller is asking for
+  // their own namespace.
+  const user = await requireSession(`/${username}`);
 
   if (owner.id !== user.id) {
     return (
@@ -54,7 +59,5 @@ export default async function UserWorkspacePage({ params }: Params) {
     );
   }
 
-  // Touch the client so a missing database configuration fails here rather than
-  // inside the navigator's first fetch.
   return <ProjectsNavigator email={user.email ?? ""} username={owner.username} />;
 }
