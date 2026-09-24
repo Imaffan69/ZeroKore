@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { motion } from "framer-motion";
 import type { LucideIcon } from "lucide-react";
-import { EASE, staggerGroup, fadeUp } from "@/lib/motion";
+import { fadeUp } from "@/lib/motion";
 
 interface QuickActionCardProps {
   icon: LucideIcon;

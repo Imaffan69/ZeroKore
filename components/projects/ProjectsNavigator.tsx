@@ -141,9 +141,12 @@ function AccountStrip({ projects }: { projects: number }) {
 export default function ProjectsNavigator({
   email,
   username,
+  workspaceHref,
 }: {
   email: string;
   username: string | null;
+  /** When set, the heading links to the account's own named address. */
+  workspaceHref?: string | null;
 }) {
   const [projects, setProjects] = useState<Project[] | null>(null);
   const [listError, setListError] = useState<string | null>(null);
@@ -222,9 +225,18 @@ export default function ProjectsNavigator({
               className="mt-2 text-2xl font-semibold tracking-[-0.02em] text-white sm:text-3xl"
             >
               {username ? (
-                <>
-                  <span className="text-kore-accent">@{username}</span>’s workspace
-                </>
+                workspaceHref ? (
+                  <Link
+                    href={workspaceHref}
+                    className="transition-colors duration-150 hover:text-kore-accent"
+                  >
+                    <span className="text-kore-accent">@{username}</span>&rsquo;s workspace
+                  </Link>
+                ) : (
+                  <>
+                    <span className="text-kore-accent">@{username}</span>&rsquo;s workspace
+                  </>
+                )
               ) : (
                 "Your projects"
               )}

@@ -65,7 +65,21 @@ function describeDevice(ua: string | null): string {
   return `${kind} · ${os} · ${browser}`;
 }
 
-/** Persist an auth event (best-effort; must never break the caller).
+export type ActivityEvent =
+  | "login"
+  | "logout"
+  | "signup"
+  | "mfa_enroll"
+  | "mfa_verify"
+  | "password_change"
+  | "session_revoke"
+  | "agent_run"
+  | "file_edit"
+  | "project_create"
+  | "github_sync"
+  | "page_view";
+
+/** Persist an activity event (best-effort; must never break the caller).
  *  Runs with the service client: `login_events` has no client write policy,
  *  so a session-client insert was being silently rejected and history stayed
  *  empty. The `db` argument is kept for call-site compatibility. */
@@ -73,7 +87,7 @@ export async function logAuthEvent(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   db: import("@supabase/supabase-js").SupabaseClient<any>,
   userId: string,
-  event: "login" | "logout" | "signup" | "mfa_enroll" | "mfa_verify" | "password_change" | "session_revoke",
+  event: ActivityEvent,
   req: Request
 ): Promise<void> {
   const info = extractRequestInfo(req);
@@ -87,6 +101,41 @@ export async function logAuthEvent(
       country: info.country,
       city: info.city,
       user_agent: info.userAgent,
+    });
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * Continuous activity capture.
+ *
+ * Auth events alone left the Security tab hours stale, so the owner could not
+ * see where traffic was coming from "right now". This records an event for
+ * ordinary product activity too — agent runs, file edits, project creation and
+ * GitHub sync — using the same IP + approximate location + device capture, so
+ * the panel shows a live picture rather than a sign-in-only history.
+ *
+ * Failures are swallowed on purpose: telemetry must never break a request.
+ */
+export async function logActivity(
+  userId: string,
+  event: ActivityEvent,
+  req: Request,
+  detail: Record<string, unknown> = {}
+): Promise<void> {
+  const info = extractRequestInfo(req);
+  try {
+    const { createServiceClient } = await import("@/lib/supabase/server");
+    const svc = await createServiceClient();
+    await svc.from("login_events").insert({
+      user_id: userId,
+      event,
+      ip: info.ip,
+      country: info.country,
+      city: info.city,
+      user_agent: info.userAgent,
+      detail,
     });
   } catch {
     // ignore

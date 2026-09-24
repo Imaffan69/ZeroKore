@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { LogIn, GitBranch, FileText, Zap, Plus, CheckCircle } from "lucide-react";
-import { EASE, staggerGroup, fadeUp } from "@/lib/motion";
+import { fadeUp } from "@/lib/motion";
 
 interface ActivityEvent {
   id: number;
@@ -18,7 +18,6 @@ interface ActivityEvent {
 
 interface ActivityFeedProps {
   username: string | null;
-  email: string;
 }
 
 const eventIcons: Record<string, typeof LogIn> = {
@@ -33,7 +32,7 @@ const eventIcons: Record<string, typeof LogIn> = {
   username_set: CheckCircle,
 };
 
-export default function ActivityFeed({ username, email }: ActivityFeedProps) {
+export default function ActivityFeed({ username }: ActivityFeedProps) {
   const [events, setEvents] = useState<ActivityEvent[]>([]);
   const [loading, setLoading] = useState(true);
 

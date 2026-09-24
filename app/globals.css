@@ -48,13 +48,17 @@ body {
   margin-inline: auto;
   padding-inline: clamp(1.15rem, 4vw, 2.5rem);
 }
-/* Full-viewport hero with the particle field behind it. */
+/* Hero: tall enough to feel full-bleed, short enough that the headline, the
+   call to action and the first proof row are all above the fold on a laptop.
+   `100svh` pushed everything below the fold, which is why the first glance
+   read as an empty page. */
 .kore-hero {
   position: relative;
   display: flex;
-  min-height: 100svh;
+  min-height: min(100svh, 860px);
   align-items: center;
   overflow: hidden;
+  padding-block: clamp(5rem, 12vh, 8rem) clamp(2.5rem, 6vh, 4rem);
 }
 
 /* Hairline dividers (not a grid) for section separation. */

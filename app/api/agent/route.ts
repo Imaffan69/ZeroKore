@@ -15,6 +15,7 @@ import {
 import { BASE_CREDIT_COST } from "@/lib/plans";
 import { runAgent } from "@/lib/ai/agent";
 import { applyArtifactToProject } from "@/lib/projects";
+import { logActivity } from "@/lib/request-info";
 import type { AgentMode, AgentResponseBody, ProviderPreference } from "@/types";
 
 export const maxDuration = 120;
@@ -116,6 +117,16 @@ export async function POST(req: NextRequest) {
     }
     projectId = requestedProjectId;
   }
+
+  // Continuous activity capture: the owner sees agent traffic (IP · approximate
+  // location · device) as it happens, not only at sign-in. Fire-and-forget so a
+  // logging failure can never slow down or break a run.
+  void logActivity(user.id, "agent_run", req, {
+    mode,
+    provider,
+    projectId,
+    bytes: message.length,
+  });
 
   // Counting is for stats only: the credits balance is the real gate, so a
   // failure here must never block a run (and the old 15/day hard stop is gone).

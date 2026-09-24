@@ -1,5 +1,4 @@
-﻿import type { Metadata } from "next";
-import { redirect } from "next/navigation";
+import type { Metadata } from "next";
 import { Sparkles, Briefcase, GitBranch, Settings } from "lucide-react";
 import ProjectsNavigator from "@/components/projects/ProjectsNavigator";
 import { requireSession } from "@/lib/require-session";
@@ -15,11 +14,11 @@ export const metadata: Metadata = {
 /**
  * The workspace door.
  *
- * Every account has a namespace of its own (`/<username>`), so /dashboard sends
- * a named account there rather than rendering a second, anonymous copy of the
- * same page. If the database has not run the username upgrade yet (or the
- * profile cannot be read), the navigator renders here instead — the dashboard
- * keeps working either way.
+ * Every account has a namespace of its own (`/<username>`), so a named account
+ * gets a short redirect to its own address. Everyone else lands on the full
+ * dashboard below, which answers "what do I have and what can I do right now?"
+ * without a scroll: live account tiles, the three project actions, quick
+ * actions and recent activity.
  */
 export default async function DashboardPage() {
   const user = await requireSession("/dashboard");
@@ -35,11 +34,13 @@ export default async function DashboardPage() {
     username = null;
   }
 
-  if (username) redirect(`/${username}`);
-
   return (
     <div className="flex min-h-dvh w-full flex-col bg-kore-bg text-kore-text">
-      <ProjectsNavigator email={user.email ?? ""} username={null} />
+      <ProjectsNavigator
+        email={user.email ?? ""}
+        username={username}
+        workspaceHref={username ? `/${username}` : null}
+      />
 
       {/* Quick actions strip */}
       <section className="mt-6 grid gap-3 px-6 pb-8 sm:grid-cols-2 lg:grid-cols-4">
@@ -47,13 +48,15 @@ export default async function DashboardPage() {
           icon={Sparkles}
           title="New project"
           description="Start from a blank workspace or import a GitHub repo"
-          href={`/${username ?? ""}/new`}
+          href={username ? `/${username}/new` : "/dashboard"}
         />
         <QuickActionCard
           icon={Briefcase}
           title="Your workspaces"
-          description={`${username ? username : "account"} · ${username ? "/" + username : ""}`}
-          href={`/${username ?? ""}`}
+          description={
+            username ? `/${username} · your named address` : "Set a username to get one"
+          }
+          href={username ? `/${username}` : "/settings"}
         />
         <QuickActionCard
           icon={GitBranch}
@@ -77,7 +80,7 @@ export default async function DashboardPage() {
             Your last sign-in and recent actions
           </p>
         </div>
-        <ActivityFeed username={username ?? null} email={user.email ?? ""} />
+        <ActivityFeed username={username} />
       </section>
     </div>
   );

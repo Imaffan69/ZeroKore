@@ -217,6 +217,27 @@ export async function runAgent(input: AgentRunInput): Promise<AgentRunResult> {
     // unknown or unreadable skill → proceed without it
   }
 
+  // --- Automatic design-system skill ---
+  // Skills used to load only when explicitly typed, so a request like "add a
+  // pricing page" produced off-brand work. When a request clearly concerns UI,
+  // the ZeroKore design system is injected automatically so the agent builds in
+  // the product's own language without the user having to remember a command.
+  if (!skillBlock) {
+    const UI_INTENT =
+      /\b(ui|ux|design|layout|page|component|button|style|styling|theme|colou?r|mobile|responsive|landing|hero|dashboard|empty|redesign|polish|animation|spacing|typography|glass|viewport|fold|sidebar|card|modal|nav)\b/i;
+    if (UI_INTENT.test(message)) {
+      try {
+        const design = await getSkill("zerokore-design-system");
+        if (design) {
+          skillBlock = `Active skill "${design.name}" — this request touches UI, so follow it exactly:\n\n${design.content.slice(0, 12000)}`;
+          events.push(event("skill_loaded", `[Skill] ${design.name}`));
+        }
+      } catch {
+        // skill file unreadable → continue without it
+      }
+    }
+  }
+
   // --- Build context ---
   const chatHistory: ChatMsg[] = history
     .filter((m) => m.role === "user" || m.role === "assistant")

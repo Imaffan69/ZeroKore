@@ -32,6 +32,12 @@ grant select, insert, update, delete on table admin_accounts to service_role;
 alter table admin_audit add column if not exists actor_label text;
 alter table announcements add column if not exists author_label text;
 
+-- Continuous activity capture: `login_events` is no longer sign-in only, it
+-- also records agent runs, file edits, project creation and GitHub sync, with
+-- the same IP + approximate location + device fields. `detail` carries the
+-- small amount of structured context (mode, provider, project id, byte count).
+alter table login_events add column if not exists detail jsonb;
+
 -- Only the service role (server-side) reads/writes this table. There are no
 -- policies on purpose: direct PostgREST access from the anon/authenticated keys
 -- is denied, so staff accounts can only be used through the server routes.

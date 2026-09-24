@@ -23,7 +23,7 @@ import {
 import ParticleField from "@/components/visual/ParticleField";
 import SavingsCalculator from "@/components/landing/SavingsCalculator";
 import CreditsPerDay from "@/components/landing/CreditsPerDay";
-import { EASE } from "@/lib/motion";
+import { EASE, fadeUp, staggerGroup } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
 /**
@@ -354,13 +354,41 @@ function Hero({ totalUsers }: { totalUsers: number | null }) {
             No credit card · Your projects live at zerokore.vercel.app/&lt;you&gt;/&lt;project&gt;
           </span>
         </motion.p>
+
+        {/* Proof row: what actually happens, stated before the first scroll, so
+            the opening screen carries substance rather than only a headline. */}
+        <motion.ul
+          initial="hidden"
+          animate="visible"
+          variants={staggerGroup(0.06, 0.3)}
+          className="mt-8 grid max-w-2xl grid-cols-2 gap-2 sm:grid-cols-4"
+        >
+          {[
+            { icon: FileCode2, label: "Real file edits", hint: "any text format" },
+            { icon: Terminal, label: "Live terminal", hint: "real commands" },
+            { icon: Layers, label: "Environments", hint: "preview + secrets" },
+            { icon: Github, label: "Git in and out", hint: "import and push" },
+          ].map(({ icon: Icon, label, hint }) => (
+            <motion.li
+              key={label}
+              variants={fadeUp}
+              className="glass-subtle rounded-xl px-3 py-2.5"
+            >
+              <Icon className="h-3.5 w-3.5 text-kore-accent" aria-hidden />
+              <p className="mt-1.5 text-[11px] font-medium leading-tight text-white">
+                {label}
+              </p>
+              <p className="text-[10px] leading-tight text-kore-muted">{hint}</p>
+            </motion.li>
+          ))}
+        </motion.ul>
         </div>
 
         <motion.div
           initial={{ opacity: 0, y: 28 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, ease: EASE, delay: 0.3 }}
-          className="relative hidden lg:block"
+          className="relative lg:mt-2"
         >
           <div className="glass overflow-hidden rounded-2xl text-left shadow-2xl shadow-black">
             <div className="flex items-center gap-1.5 border-b border-white/10 px-4 py-3">
