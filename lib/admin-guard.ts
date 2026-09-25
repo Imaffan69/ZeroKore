@@ -92,7 +92,13 @@ export async function requireOwner(): Promise<AdminContext> {
   return { ...actor, minRole: "owner" };
 }
 
-/** Map a thrown error for an admin route (401 / 403 / 500). */
+/** Map a thrown error for an admin route (401 / 403 / 500).
+ *
+ * Previously anything unrecognised became a generic 500 with no detail, which
+ * made real failures (a database trigger rejecting an update, for example)
+ * impossible to diagnose from the panel. The message is now surfaced to the
+ * caller — it contains no secrets, only the database/route error text.
+ */
 export function adminError(err: unknown): NextResponse {
   if (err instanceof UnauthorizedError) {
     return NextResponse.json({ error: err.message }, { status: 401 });
@@ -101,8 +107,19 @@ export function adminError(err: unknown): NextResponse {
     return NextResponse.json({ error: err.message }, { status: 403 });
   }
   const message = err instanceof Error ? err.message : "";
-  if (/required|could not|not found|taken|invalid/i.test(message)) {
-    return NextResponse.json({ error: message || "Request failed." }, { status: 400 });
+  if (message) {
+    // Log server-side too, so the failure is visible without reproducing it.
+    console.error(`[admin] ${message}`);
+    // A database trigger or constraint rejection is a client-visible problem
+    // (the owner can act on it), not a server fault.
+    const isConstraint =
+      /not permitted|not allowed|violates|duplicate|already exists|Role changes|Suspension can only|permission denied/i.test(
+        message
+      );
+    return NextResponse.json(
+      { error: message.slice(0, 300) },
+      { status: isConstraint ? 409 : 500 }
+    );
   }
   return NextResponse.json(
     { error: "That request could not be completed. Please try again." },

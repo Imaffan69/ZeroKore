@@ -12,6 +12,14 @@ export interface RequestInfo {
   city: string | null;
   userAgent: string | null;
   device: string;
+  /** Set when a real lookup ran (not just platform headers). */
+  precise: boolean;
+  region?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  timezone?: string | null;
+  asn?: string | null;
+  network?: string | null;
 }
 
 export function extractIp(req: Request): string | null {
@@ -36,6 +44,111 @@ export function extractRequestInfo(req: Request): RequestInfo {
     city: h.get("x-vercel-ip-city"),
     userAgent: ua,
     device: describeDevice(ua),
+    precise: false,
+  };
+}
+
+/**
+ * Real IP geolocation via ipgeolocation.io.
+ *
+ * Vercel's `x-vercel-ip-*` headers only populate for requests that actually
+ * traverse Vercel's edge, so on some paths (and locally) country/city were simply
+ * null — which is why the admin Security tab showed an IP with no location.
+ * When `IP_LOCATION_API` is set we do an authoritative lookup and keep the
+ * coordinates, timezone and network, so the panel can place a session on a map.
+ *
+ * Private/reserved addresses are never sent to a third party, and the result is
+ * cached in-process so a burst of requests costs one lookup per IP per minute.
+ */
+const geoCache = new Map<string, { at: number; info: GeoLookup }>();
+const GEO_TTL_MS = 60_000;
+
+interface GeoLookup {
+  country: string | null;
+  city: string | null;
+  region: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  timezone: string | null;
+  asn: string | null;
+  network: string | null;
+}
+
+function isPublicIpv4(ip: string): boolean {
+  const parts = ip.split(".").map(Number);
+  if (parts.length !== 4 || parts.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) {
+    return false;
+  }
+  const [a, b] = parts;
+  if (a === 10 || a === 127 || a === 0) return false;
+  if (a === 172 && b >= 16 && b <= 31) return false;
+  if (a === 192 && b === 168) return false;
+  if (a === 169 && b === 254) return false;
+  if (a === 100 && b >= 64 && b <= 127) return false;
+  return true;
+}
+
+export function isPublicIp(ip: string | null): boolean {
+  if (!ip) return false;
+  if (ip.includes(":")) {
+    // IPv6 loopback / unique-local
+    const lower = ip.toLowerCase();
+    return !lower.startsWith("::1") && !lower.startsWith("fc") && !lower.startsWith("fd");
+  }
+  return isPublicIpv4(ip);
+}
+
+async function lookupGeo(ip: string): Promise<GeoLookup | null> {
+  const key = process.env.IP_LOCATION_API;
+  if (!key || !isPublicIp(ip)) return null;
+
+  const cached = geoCache.get(ip);
+  if (cached && Date.now() - cached.at < GEO_TTL_MS) return cached.info;
+
+  try {
+    const res = await fetch(
+      `https://api.ipgeolocation.io/ipgeo?apiKey=${encodeURIComponent(key)}&ip=${encodeURIComponent(ip)}`,
+      { signal: AbortSignal.timeout(6000) }
+    );
+    if (!res.ok) return null;
+    const json = (await res.json()) as Record<string, unknown>;
+    if (json?.success === 0 || !json?.country_name) return null;
+    const info: GeoLookup = {
+      country: (json.country_name as string) ?? null,
+      city: (json.city as string) ?? null,
+      region: (json.region as string) ?? null,
+      latitude: typeof json.latitude === "string" ? Number(json.latitude) : (json.latitude as number) ?? null,
+      longitude:
+        typeof json.longitude === "string" ? Number(json.longitude) : (json.longitude as number) ?? null,
+      timezone: (json.time_zone as string) ?? null,
+      asn: (json.asn as string) ?? null,
+      network: (json.asn_name as string) ?? null,
+    };
+    geoCache.set(ip, { at: Date.now(), info });
+    return info;
+  } catch {
+    // A failed lookup must never break the request it was describing.
+    return null;
+  }
+}
+
+/** Request info enriched with a real geolocation lookup when one is available. */
+export async function describeRequest(req: Request): Promise<RequestInfo> {
+  const base = extractRequestInfo(req);
+  if (!base.ip) return base;
+  const geo = await lookupGeo(base.ip);
+  if (!geo) return base;
+  return {
+    ...base,
+    country: geo.country ?? base.country,
+    city: geo.city ?? base.city,
+    region: geo.region,
+    latitude: geo.latitude,
+    longitude: geo.longitude,
+    timezone: geo.timezone,
+    asn: geo.asn,
+    network: geo.network,
+    precise: true,
   };
 }
 
@@ -108,13 +221,14 @@ export async function logAuthEvent(
 }
 
 /**
- * Continuous activity capture.
+ * Universal activity capture.
  *
- * Auth events alone left the Security tab hours stale, so the owner could not
- * see where traffic was coming from "right now". This records an event for
- * ordinary product activity too — agent runs, file edits, project creation and
- * GitHub sync — using the same IP + approximate location + device capture, so
- * the panel shows a live picture rather than a sign-in-only history.
+ * Auth events alone left the Security tab empty, because most sign-ins never
+ * pass through the OAuth callback: email + password, and username + password,
+ * both authenticate straight against Supabase from the browser. The client
+ * calls this endpoint once the session exists, so *every* sign-in method is
+ * recorded — with the real IP, the approximate location resolved from it, and
+ * the device.
  *
  * Failures are swallowed on purpose: telemetry must never break a request.
  */
@@ -124,8 +238,8 @@ export async function logActivity(
   req: Request,
   detail: Record<string, unknown> = {}
 ): Promise<void> {
-  const info = extractRequestInfo(req);
   try {
+    const info = await describeRequest(req);
     const { createServiceClient } = await import("@/lib/supabase/server");
     const svc = await createServiceClient();
     await svc.from("login_events").insert({
@@ -135,7 +249,17 @@ export async function logActivity(
       country: info.country,
       city: info.city,
       user_agent: info.userAgent,
-      detail,
+      detail: {
+        ...detail,
+        device: info.device,
+        region: info.region,
+        latitude: info.latitude,
+        longitude: info.longitude,
+        timezone: info.timezone,
+        asn: info.asn,
+        network: info.network,
+        precise: info.precise,
+      },
     });
   } catch {
     // ignore

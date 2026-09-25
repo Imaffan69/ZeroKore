@@ -54,6 +54,28 @@ function humanizeAuthError(message: string): string {
 
 type Mode = "login" | "signup";
 
+/**
+ * Record the sign-in server-side.
+ *
+ * Email/password and username/password authenticate directly against Supabase
+ * in the browser, so they never pass through `/auth/callback` — which is why
+ * the admin Security tab showed no IP addresses for those users. This posts the
+ * event once the session exists. Fire-and-forget: telemetry must never block or
+ * fail a sign-in.
+ */
+function recordSignIn(event: "login" | "signup") {
+  try {
+    void fetch("/api/account/activity", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ event }),
+      keepalive: true,
+    }).catch(() => undefined);
+  } catch {
+    // never surface a telemetry failure to the user
+  }
+}
+
 function validateEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
@@ -152,6 +174,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
         // Auto-continue when email confirmation is disabled.
         const { data: sessionData } = await supabase.auth.getSession();
         if (sessionData?.session) {
+          recordSignIn("signup");
           router.push(next);
           router.refresh();
         }
@@ -168,6 +191,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
           setError(data?.error ?? "Could not sign in. Try again.");
           return;
         }
+        recordSignIn("login");
         router.push(next);
         router.refresh();
       } else {
@@ -186,6 +210,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
           }
           return;
         }
+        recordSignIn("login");
         router.push(next);
         router.refresh();
       }
