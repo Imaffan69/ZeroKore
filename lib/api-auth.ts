@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createBearerClient } from "@/lib/supabase/server";
 
 /**
  * Shared authentication for route handlers.
@@ -53,10 +53,22 @@ export interface AuthContext {
   user: User;
 }
 
-export async function requireUser(): Promise<AuthContext> {
+export async function requireUser(req?: Request): Promise<AuthContext> {
   let supabase;
+
+  // Non-browser callers (the CLI, the desktop app) authenticate with a
+  // Supabase access token instead of the browser cookie session. Supabase
+  // verifies the token server-side, so this is the same trust level as a
+  // cookie — it just does not need a cookie jar.
+  const header = req?.headers.get("authorization") ?? "";
+  const bearer = header.toLowerCase().startsWith("bearer ")
+    ? header.slice(7).trim()
+    : "";
+
   try {
-    supabase = await createClient();
+    supabase = bearer
+      ? await createBearerClient(bearer)
+      : await createClient();
   } catch {
     throw new MisconfiguredError();
   }

@@ -12,9 +12,9 @@ import type { Project } from "@/types/projects";
 export const dynamic = "force-dynamic";
 
 /** List the caller's projects, most recently updated first. */
-export async function GET() {
+export async function GET(req: Request) {
   try {
-    const { supabase, user } = await requireUser();
+    const { supabase, user } = await requireUser(req);
     const { data, error } = await supabase
       .from("projects")
       .select("*")
@@ -43,7 +43,7 @@ export async function GET() {
 /** Create a project. Always provisions its default environments. */
 export async function POST(req: Request) {
   try {
-    const { supabase, user } = await requireUser();
+    const { supabase, user } = await requireUser(req);
     const body = await readJson(req);
 
     const name = readString(body, "name", 80);

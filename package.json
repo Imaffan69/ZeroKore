@@ -12,7 +12,12 @@
     "desktop": "electron desktop/main.js",
     "desktop:icon": "node desktop/make-icon.js",
     "desktop:package": "electron-builder --win --x64",
-    "desktop:dir": "electron-builder --win --x64 --dir"
+    "desktop:dir": "electron-builder --win --x64 --dir",
+    "zerokore": "node cli/zerokore.js",
+    "cli": "node cli/zerokore.js"
+  },
+  "bin": {
+    "zerokore": "cli/zerokore.js"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
