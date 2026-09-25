@@ -5,6 +5,44 @@ was actually verified. Deployment is via `git push origin main` → Vercel.
 
 ---
 
+## 2026-09-25 — Sign-in 500 and suspended-account UX
+
+**The 500 affecting every signed-in user**
+- `logActivity()` inserted a `detail` (jsonb) column into `login_events` that was
+  never added to the database — the code shipped ahead of its migration. Every
+  insert failed on an unknown column, so `POST /api/account/activity` returned
+  **500** on every sign-in and the admin Security tab had **no IP addresses at
+  all** (the table was empty).
+- Fix: `supabase/migrations/005_login_event_detail.sql` adds the column, and
+  `logActivity` now **retries without `detail`** when the insert is rejected, so
+  the audit row is recorded even on a database without the migration. The failure
+  is logged server-side instead of vanishing. `logAuthEvent` hardened identically.
+- Run `005_login_event_detail.sql` in Supabase to restore the device/coordinate
+  enrichment. Sign-in recording works without it.
+
+**Suspended accounts are now told directly, on the login page**
+- Supabase Auth does not know about `profiles.suspended`, so it created a session
+  for a banned account and every later request failed 403 — the user saw a generic
+  error and never learned why.
+- `GET /api/account/identity` now uses `getSession()` instead of `requireUser()`
+  and reports `suspended`, so the question can be asked without being blocked by it.
+- The login form checks it after every successful sign-in (email, username, OAuth),
+  **signs the session back out**, and shows *"This account has been suspended.
+  Contact support if you believe this is a mistake."* — they never reach another page.
+- Enforcement is unchanged: `requireUser()` remains the authority, so an unsuspended
+  user is never blocked by a failed check.
+
+**Verification**
+- Live database checked directly: `profiles.suspended` exists, **no account is
+  currently suspended**, `credits` and `site_flags` healthy, `login_events` empty
+  (confirming the logging gap).
+- Added `scripts/diag-login.js`: a reproducible diagnostic that signs in as a real
+  account and calls every protected route, so future "it's throwing 500" reports are
+  measured rather than guessed. Its first run exposed that the Supabase token
+  endpoint is POST-only (a GET returns 405).
+- `tsc --noEmit` clean, `next build` 46/46 pages.
+
+
 ## 2026-09-25 — Desktop app, IP/location capture, owner fix
 
 **Desktop (new, real)**

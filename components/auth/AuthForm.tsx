@@ -80,6 +80,33 @@ function validateEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
+/**
+ * Refuse a suspended account before it can reach any page.
+ *
+ * Supabase Auth does not know about our `profiles.suspended` flag, so it happily
+ * creates a session for a banned account. Every later API call then answers 403
+ * and the user is bounced around between pages with no explanation. This checks
+ * the flag immediately after a successful sign-in, signs the session back out, and
+ * returns the reason so it can be shown on the login page itself.
+ *
+ * A failure to check is not a reason to block someone: the server-side
+ * `requireUser()` gate remains the authority, this is only the fast, clear path.
+ */
+async function checkSuspended(supabase: {
+  auth: { signOut: () => Promise<unknown> };
+}): Promise<string | null> {
+  try {
+    const res = await fetch("/api/account/identity", { cache: "no-store" });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { suspended?: boolean };
+    if (!data?.suspended) return null;
+    await supabase.auth.signOut();
+    return "This account has been suspended. Contact support if you believe this is a mistake.";
+  } catch {
+    return null;
+  }
+}
+
 /** The public shape of a ZeroKore URL, shown live while typing a username. */
 export function publicUrlPreview(username: string): string {
   return `zerokore.vercel.app/${username || "your-name"}/project-name`;
@@ -191,6 +218,11 @@ export default function AuthForm({ mode }: { mode: Mode }) {
           setError(data?.error ?? "Could not sign in. Try again.");
           return;
         }
+        const blocked = await checkSuspended(supabase);
+        if (blocked) {
+          setError(blocked);
+          return;
+        }
         recordSignIn("login");
         router.push(next);
         router.refresh();
@@ -208,6 +240,11 @@ export default function AuthForm({ mode }: { mode: Mode }) {
           } else {
             setError(humanizeAuthError(signInError.message));
           }
+          return;
+        }
+        const blocked = await checkSuspended(supabase);
+        if (blocked) {
+          setError(blocked);
           return;
         }
         recordSignIn("login");

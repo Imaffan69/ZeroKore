@@ -207,7 +207,9 @@ export async function logAuthEvent(
   try {
     const { createServiceClient } = await import("@/lib/supabase/server");
     const svc = await createServiceClient();
-    await svc.from("login_events").insert({
+    // Core columns only: `detail` (jsonb) is intentionally omitted here so this
+    // path also works on a database without migration 005 applied.
+    const { error } = await svc.from("login_events").insert({
       user_id: userId,
       event,
       ip: info.ip,
@@ -215,6 +217,15 @@ export async function logAuthEvent(
       city: info.city,
       user_agent: info.userAgent,
     });
+    if (error) {
+      console.log(
+        JSON.stringify({
+          event: "login_event_write_failed",
+          code: error.code ?? null,
+          message: error.message,
+        })
+      );
+    }
   } catch {
     // ignore
   }
@@ -242,13 +253,17 @@ export async function logActivity(
     const info = await describeRequest(req);
     const { createServiceClient } = await import("@/lib/supabase/server");
     const svc = await createServiceClient();
-    await svc.from("login_events").insert({
+    const { error } = await svc.from("login_events").insert({
       user_id: userId,
       event,
       ip: info.ip,
       country: info.country,
       city: info.city,
       user_agent: info.userAgent,
+      // `detail` is jsonb, added by supabase/migrations/005_login_event_detail.sql.
+      // It is written apart from the core columns so a database that has not
+      // applied that migration still records the sign-in, rather than the whole
+      // insert failing on an unknown column and losing the event entirely.
       detail: {
         ...detail,
         device: info.device,
@@ -261,7 +276,26 @@ export async function logActivity(
         precise: info.precise,
       },
     });
+    if (error) {
+      // Retry without the enrichment: device/geo detail is nice-to-have, the
+      // audit row itself is not. A sign-in is recorded either way.
+      console.log(
+        JSON.stringify({
+          event: "login_event_detail_retry",
+          code: error.code ?? null,
+          message: error.message,
+        })
+      );
+      await svc.from("login_events").insert({
+        user_id: userId,
+        event,
+        ip: info.ip,
+        country: info.country,
+        city: info.city,
+        user_agent: info.userAgent,
+      });
+    }
   } catch {
-    // ignore
+    // Telemetry must never break the request it is describing.
   }
 }
