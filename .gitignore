@@ -36,3 +36,6 @@ next-env.d.ts
 # Electron desktop build output
 release/
 desktop/build/icon.ico
+
+# local test credential scratch file
+body.json
