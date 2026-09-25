@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { motion } from "framer-motion";
+import Link from "next/link";
 import {
   User,
   Cpu,
@@ -41,6 +42,9 @@ interface HealthData {
   models: ProviderInfo[];
   search: string;
   github: string;
+  encryption: string;
+  serviceRole: string;
+  staff: string;
 }
 
 export interface SettingsPanelProps {
@@ -52,6 +56,131 @@ export interface SettingsPanelProps {
   preferredProvider: ProviderPreference;
   onProviderChange: (p: ProviderPreference) => void;
   onToast: (msg: string) => void;
+}
+
+function UsernameRow({ onToast }: { onToast: (msg: string) => void }) {
+  const [username, setUsername] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/account/username");
+        if (res.ok) {
+          const data = await res.json();
+          setUsername(data.username ?? null);
+          setDraft(data.username ?? "");
+        }
+      } catch {
+        // stays unknown; never faked
+      } finally {
+        setLoaded(true);
+      }
+    })();
+  }, []);
+
+  async function save() {
+    const wanted = draft.trim().toLowerCase();
+    if (!wanted || wanted === username) return;
+    setBusy(true);
+    try {
+      const res = await fetch("/api/account/username", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: wanted }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        onToast(data?.error ?? "Could not update the username.");
+        setDraft(username ?? "");
+        return;
+      }
+      setUsername(data.username);
+      setDraft(data.username);
+      onToast(`Username set to @${data.username}. Projects live at /${data.username}/…`);
+    } catch {
+      onToast("Connection failed while saving the username.");
+      setDraft(username ?? "");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-kore-muted">Username</span>
+      {!loaded ? (
+        <span className="font-mono text-xs text-kore-faint">Loading…</span>
+      ) : (
+        <span className="flex min-w-0 items-center justify-end gap-2">
+          <span className="font-mono text-xs text-kore-faint" aria-hidden>@</span>
+          <input
+            value={draft}
+            onChange={(e) =>
+              setDraft(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))
+            }
+            onBlur={save}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+            }}
+            disabled={busy}
+            maxLength={30}
+            spellCheck={false}
+            autoComplete="off"
+            aria-label="Your username"
+            className="w-36 rounded-lg border border-white/10 bg-black/40 px-2.5 py-1.5 font-mono text-xs text-white outline-none transition focus:border-kore-accent/60 disabled:opacity-60"
+          />
+        </span>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Staff-only entry point to the hidden control panel.
+ *
+ * Renders nothing at all for ordinary accounts, so the panel stays unlisted.
+ * This is convenience only — /kore/admin re-checks the role server-side on
+ * every request, and the panel APIs enforce their own thresholds.
+ */
+function StaffRow() {
+  const [identity, setIdentity] = useState<{ role: string; isStaff: boolean } | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/account/identity");
+        if (res.ok) {
+          const data = await res.json();
+          setIdentity({ role: data.role, isStaff: Boolean(data.isStaff) });
+        }
+      } catch {
+        // silent — the row simply stays hidden
+      }
+    })();
+  }, []);
+
+  if (!identity?.isStaff) return null;
+
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-kore-muted">Access level</span>
+      <span className="flex items-center gap-2">
+        <span className="rounded-full border border-kore-accent/40 bg-kore-accent/10 px-2 py-0.5 font-mono text-[11px] uppercase tracking-wide text-kore-accent">
+          {identity.role}
+        </span>
+        <Link
+          href="/kore/admin"
+          className="inline-flex items-center gap-1 text-xs font-medium text-kore-accent hover:underline"
+        >
+          Control panel
+          <ExternalLink className="h-3 w-3" aria-hidden />
+        </Link>
+      </span>
+    </div>
+  );
 }
 
 function StatusRow({
@@ -226,6 +355,7 @@ export default function SettingsPanel({
                       {email || "—"}
                     </span>
                   </div>
+                  <UsernameRow onToast={onToast} />
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-kore-muted">Daily usage</span>
                     <span className="font-mono text-kore-text">
@@ -236,6 +366,17 @@ export default function SettingsPanel({
                         : "Loading…"}
                     </span>
                   </div>
+                  <div className="flex items-center justify-between gap-3 pt-1">
+                    <span className="text-kore-muted">More controls</span>
+                    <Link
+                      href="/account"
+                      className="inline-flex items-center gap-1 text-xs font-medium text-kore-accent hover:underline"
+                    >
+                      Open full account area
+                      <ExternalLink className="h-3 w-3" aria-hidden />
+                    </Link>
+                  </div>
+                  <StaffRow />
                 </div>
               </motion.section>
 
@@ -503,8 +644,35 @@ export default function SettingsPanel({
                     detail={health?.github ?? "checking…"}
                     warn
                   />
+                  <StatusRow
+                    label="Secret storage (service role)"
+                    ok={health ? health.serviceRole === "configured" : false}
+                    detail={health?.serviceRole ?? "checking…"}
+                    warn
+                  />
+                  <StatusRow
+                    label="Project secrets (AES-256-GCM)"
+                    ok={health ? health.encryption === "configured" : false}
+                    detail={health?.encryption ?? "checking…"}
+                    warn
+                  />
                 </div>
+                {health?.encryption === "not configured" && (
+                  <p className="mt-3 text-xs leading-relaxed text-kore-muted">
+                    Add <span className="font-mono">ENCRYPTION_KEY</span> to the
+                    server environment to store project secrets. Generate one with{" "}
+                    <span className="font-mono">
+                      node -e &quot;console.log(require(&apos;crypto&apos;).randomBytes(32).toString(&apos;base64&apos;))&quot;
+                    </span>
+                    . Until then the Secrets environment reports that it is
+                    unconfigured instead of storing values in plaintext.
+                  </p>
+                )}
               </motion.section>
+
+              {/* Staff entry point. Rendered only for authorised staff — an
+                  ordinary account learns nothing about the control panel, and
+                  the health snapshot no longer advertises it to everyone. */}
 
               <motion.section
                 variants={fadeUp}

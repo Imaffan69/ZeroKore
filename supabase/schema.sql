@@ -18,6 +18,39 @@ create table if not exists public.profiles (
 );
 
 -- ------------------------------------------------------------
+-- Usernames: the public identity behind every project URL
+-- (`/<username>/<project>`). Added in place so a fresh install has
+-- them from the start; the idempotent block at the end of this file
+-- upgrades an existing database.
+-- ------------------------------------------------------------
+alter table public.profiles add column if not exists username text;
+alter table public.profiles add column if not exists display_name text;
+
+-- One name per person, case-insensitively.
+create unique index if not exists profiles_username_key
+  on public.profiles (lower(username))
+  where username is not null;
+
+-- Shape guard. Reserved words and slurs are rejected in the API layer
+-- (lib/username.ts) where the list can be maintained; this constraint is the
+-- backstop that keeps junk out even if a client talks to PostgREST directly.
+alter table public.profiles drop constraint if exists profiles_username_shape;
+alter table public.profiles add constraint profiles_username_shape check (
+  username is null
+  or (
+    username ~ '^[a-z0-9](?:[a-z0-9_-]*[a-z0-9])$'
+    and char_length(username) between 3 and 30
+    and lower(username) not in (
+      'admin','administrator','owner','root','superuser','moderator','staff',
+      'official','support','help','system','zerokore','api','app','auth',
+      'login','signup','settings','dashboard','projects','status','www',
+      'mail','about','pricing','terms','privacy','docs','blog','team',
+      'test','demo','null','undefined','anonymous','guest','user','me'
+    )
+  )
+);
+
+-- ------------------------------------------------------------
 -- user_usage: daily AI request counter per user.
 -- ------------------------------------------------------------
 create table if not exists public.user_usage (
@@ -178,9 +211,37 @@ language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  base text;
+  chosen text;
+  candidate text;
+  n integer := 0;
 begin
-  insert into public.profiles (id, email, role)
-  values (NEW.id, NEW.email, 'user')
+  -- Seed a username from the email local part, then make it unique and legal.
+  base := lower(split_part(coalesce(NEW.email, ''), '@', 1));
+  base := regexp_replace(base, '[^a-z0-9]+', '-', 'g');
+  base := trim(both '-' from base);
+  if char_length(base) < 3 then
+    base := 'builder';
+  end if;
+  base := left(base, 24);
+
+  -- A username chosen at signup wins, as long as it survives the same shape
+  -- rules the API enforces. Anything else falls back to the email-derived stem.
+  chosen := lower(trim(coalesce(NEW.raw_user_meta_data ->> 'username', '')));
+  if chosen ~ '^[a-z0-9](?:[a-z0-9_-]*[a-z0-9])$'
+     and char_length(chosen) between 3 and 30 then
+    base := chosen;
+  end if;
+
+  candidate := base;
+  while exists (select 1 from public.profiles p where lower(p.username) = candidate) loop
+    n := n + 1;
+    candidate := left(base, 24) || '-' || n::text;
+  end loop;
+
+  insert into public.profiles (id, email, role, username)
+  values (NEW.id, NEW.email, 'user', candidate)
   on conflict (id) do nothing;
 
   insert into public.user_usage (user_id, requests_today, last_request_date)
@@ -226,3 +287,185 @@ as $$
   order by m.embedding <=> p_embedding
   limit greatest(1, least(p_limit, 20));
 $$;
+
+-- ============================================================
+-- projects: the workspace unit. Created here, imported from GitHub,
+-- or continued. Each project owns files, environments and secrets.
+-- ============================================================
+create table if not exists public.projects (
+  id uuid primary key default uuid_generate_v4(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  -- URL-safe identifier: /projects/<slug>
+  slug text not null,
+  name text not null,
+  description text not null default '',
+  -- How the project entered ZeroKore.
+  source text not null default 'created'
+    check (source in ('created', 'github', 'imported')),
+  github_repo text,
+  github_branch text,
+  status text not null default 'active'
+    check (status in ('active', 'archived')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (user_id, slug)
+);
+create index if not exists projects_user_idx
+  on public.projects (user_id, updated_at desc);
+
+-- ------------------------------------------------------------
+-- project_files: the project's real file tree, edited in the code editor.
+-- ------------------------------------------------------------
+create table if not exists public.project_files (
+  id uuid primary key default uuid_generate_v4(),
+  project_id uuid not null references public.projects (id) on delete cascade,
+  path text not null,
+  content text not null default '',
+  language text not null default 'plaintext',
+  updated_at timestamptz not null default now(),
+  unique (project_id, path)
+);
+create index if not exists project_files_project_idx
+  on public.project_files (project_id, path);
+
+-- ------------------------------------------------------------
+-- project_environments: the named surfaces of a project (the old
+-- "artifact" concept, project-scoped and split by kind).
+-- 'preview'    — rendered html/svg output, shown in a sandboxed frame
+-- 'terminal'   — command transcript (real output only, never simulated)
+-- 'dev_server' — dev server binding/status for the project
+-- 'secrets'    — key/value environment variables (values never leave the server)
+-- ------------------------------------------------------------
+create table if not exists public.project_environments (
+  id uuid primary key default uuid_generate_v4(),
+  project_id uuid not null references public.projects (id) on delete cascade,
+  kind text not null
+    check (kind in ('preview', 'terminal', 'dev_server', 'secrets')),
+  label text not null default '',
+  content text not null default '',
+  language text not null default 'html',
+  -- Server-owned state (status, port, last run). Never trusted from the client.
+  state jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (project_id, kind)
+);
+create index if not exists project_environments_project_idx
+  on public.project_environments (project_id, kind);
+
+-- ------------------------------------------------------------
+-- project_secrets: environment variables for a project.
+-- Server-only: encrypted at rest, and RLS has NO client policies, so a
+-- browser session can never read a value back (same model as
+-- github_connections). The UI sees key names only.
+-- ------------------------------------------------------------
+create table if not exists public.project_secrets (
+  id uuid primary key default uuid_generate_v4(),
+  project_id uuid not null references public.projects (id) on delete cascade,
+  key text not null,
+  -- AES-256-GCM ciphertext (iv:tag:data), written only by the server.
+  value_encrypted text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (project_id, key)
+);
+
+alter table public.projects enable row level security;
+alter table public.project_files enable row level security;
+alter table public.project_environments enable row level security;
+alter table public.project_secrets enable row level security;
+
+-- projects: full owner CRUD.
+drop policy if exists "projects_owner_all" on public.projects;
+create policy "projects_owner_all" on public.projects
+  for all using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+-- project_files: allowed only inside projects owned by the caller.
+drop policy if exists "project_files_owner_all" on public.project_files;
+create policy "project_files_owner_all" on public.project_files
+  for all using (
+    exists (
+      select 1 from public.projects p
+      where p.id = project_files.project_id and p.user_id = auth.uid()
+    )
+  )
+  with check (
+    exists (
+      select 1 from public.projects p
+      where p.id = project_files.project_id and p.user_id = auth.uid()
+    )
+  );
+
+-- project_environments: same ownership rule.
+drop policy if exists "project_environments_owner_all"
+  on public.project_environments;
+create policy "project_environments_owner_all" on public.project_environments
+  for all using (
+    exists (
+      select 1 from public.projects p
+      where p.id = project_environments.project_id and p.user_id = auth.uid()
+    )
+  )
+  with check (
+    exists (
+      select 1 from public.projects p
+      where p.id = project_environments.project_id and p.user_id = auth.uid()
+    )
+  );
+
+-- project_secrets: intentionally NO client policies (server-only access).
+
+-- ------------------------------------------------------------
+-- conversations can belong to a project. Nullable: a standalone chat
+-- (the previous behaviour) stays valid and keeps working.
+-- ------------------------------------------------------------
+alter table public.conversations
+  add column if not exists project_id uuid
+  references public.projects (id) on delete set null;
+create index if not exists conversations_project_idx
+  on public.conversations (project_id, created_at desc);
+
+-- ============================================================
+-- Upgrade block: usernames for accounts that predate them.
+-- Idempotent — safe to run on its own in the SQL editor, and safe to
+-- re-run after future changes. Only touches rows with a null username.
+-- ============================================================
+do $$
+declare
+  r record;
+  base text;
+  candidate text;
+  n integer;
+begin
+  for r in
+    select p.id, p.email
+    from public.profiles p
+    where p.username is null
+    order by p.created_at
+  loop
+    base := lower(split_part(coalesce(r.email, ''), '@', 1));
+    base := regexp_replace(base, '[^a-z0-9]+', '-', 'g');
+    base := trim(both '-' from base);
+    if char_length(base) < 3 then
+      base := 'builder-' || left(replace(r.id::text, '-', ''), 6);
+    end if;
+    base := left(base, 24);
+
+    candidate := base;
+    n := 0;
+    while exists (
+      select 1 from public.profiles p2 where lower(p2.username) = candidate
+    ) loop
+      n := n + 1;
+      candidate := left(base, 24) || '-' || n::text;
+    end loop;
+
+    update public.profiles set username = candidate where id = r.id;
+  end loop;
+end;
+$$;
+
+-- Confirm the result: every profile should now have a username.
+-- select id, username, email from public.profiles order by created_at;
+

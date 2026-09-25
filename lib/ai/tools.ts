@@ -18,6 +18,8 @@ export interface ToolContext {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: SupabaseClient<any>;
   userId: string;
+  /** Active project id (verified owner). File tools are project-scoped. */
+  projectId: string | null;
 }
 
 const ARTIFACT_TYPES: ArtifactType[] = ["code", "html", "svg", "markdown"];
@@ -95,8 +97,71 @@ export function toolSpecs(tavilyAvailable: boolean): ToolSpec[] {
         required: ["type", "title", "content"],
       },
     },
+    ...fileToolSpecs(),
   ];
   return specs;
+}
+
+/** Project file tools — operate on the caller's own project_files rows. */
+function fileToolSpecs(): ToolSpec[] {
+  return [
+    {
+      name: "list_files",
+      description:
+        "List every file in the current project (path, size, kind). Free and fast — call this first before editing files.",
+      parameters: { type: "object", properties: {} },
+    },
+    {
+      name: "read_file",
+      description:
+        "Read the full content of one project file by path. Works for any text file (ts/js/py/go/rs/java/cpp/php/rb/kt/swift/json/yaml/xml/csv/env/Dockerfile/md/…); binaries are refused.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: { type: "string", description: "File path within the project" },
+        },
+        required: ["path"],
+      },
+    },
+    {
+      name: "write_file",
+      description:
+        "Create a new project file or overwrite an existing one with COMPLETE content. Prefer edit_file for small changes.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: { type: "string", description: "File path within the project" },
+          content: { type: "string", description: "Full file content" },
+        },
+        required: ["path", "content"],
+      },
+    },
+    {
+      name: "edit_file",
+      description:
+        "Surgically edit an existing project file: replace an exact old_string with new_string. Failures report the closest match; never rewrite the whole file for small edits.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: { type: "string", description: "File path within the project" },
+          old_string: { type: "string", description: "Exact text to replace" },
+          new_string: { type: "string", description: "Replacement text" },
+        },
+        required: ["path", "old_string", "new_string"],
+      },
+    },
+    {
+      name: "delete_file",
+      description: "Delete a project file by path. Use only when removal is intended.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: { type: "string", description: "File path within the project" },
+        },
+        required: ["path"],
+      },
+    },
+  ];
 }
 
 export interface ExecutedTool {
@@ -135,6 +200,16 @@ export async function executeTool(
         };
       case "generate_artifact":
         return runGenerateArtifact(args);
+      case "list_files":
+        return { artifact: null, execResult: await runListFiles(ctx) };
+      case "read_file":
+        return { artifact: null, execResult: await runReadFile(ctx, args) };
+      case "write_file":
+        return { artifact: null, execResult: await runWriteFile(ctx, args) };
+      case "edit_file":
+        return { artifact: null, execResult: await runEditFile(ctx, args) };
+      case "delete_file":
+        return { artifact: null, execResult: await runDeleteFile(ctx, args) };
       default:
         return {
           artifact: null,
@@ -325,4 +400,223 @@ function runGenerateArtifact(
       result: { generated: true, type, title },
     },
   };
+}
+
+// ============================================================
+// Project file tools — real rows in project_files, owner-scoped.
+// ============================================================
+
+/** Extensions we can safely treat as text. Everything else is refused. */
+const TEXT_EXTENSIONS = new Set([
+  "ts", "tsx", "js", "jsx", "mjs", "cjs", "json", "jsonc", "md", "mdx", "txt",
+  "css", "scss", "sass", "less", "html", "htm", "xml", "svg", "yml", "yaml",
+  "toml", "ini", "cfg", "conf", "env", "properties", "py", "rb", "go", "rs",
+  "java", "kt", "kts", "swift", "c", "h", "cpp", "cc", "cxx", "hpp", "cs",
+  "php", "pl", "sh", "bash", "zsh", "fish", "ps1", "bat", "cmd", "sql",
+  "graphql", "gql", "proto", "vue", "svelte", "astro", "dart", "lua", "r",
+  "gitignore", "editorconfig", "npmrc", "nvmrc", "babelrc", "eslintrc",
+  "prettierrc", "dockerfile", "makefile", "lock",
+]);
+
+function isTextPath(path: string): boolean {
+  const base = path.split("/").pop() ?? path;
+  const ext = base.includes(".")
+    ? base.split(".").pop()!.toLowerCase()
+    : base.toLowerCase();
+  return TEXT_EXTENSIONS.has(ext);
+}
+
+function projectFileError(message: string): ToolExecResult {
+  return { ok: false, error: message };
+}
+
+async function loadProjectFile(
+  ctx: ToolContext,
+  path: string
+): Promise<ProjectFileRow | null> {
+  const { data } = await ctx.supabase
+    .from("project_files")
+    .select("id, path, content, size")
+    .eq("project_id", ctx.projectId!)
+    .eq("path", path)
+    .maybeSingle();
+  return (data as ProjectFileRow) ?? null;
+}
+
+interface ProjectFileRow {
+  id: string;
+  path: string;
+  content: string | null;
+  size: number | null;
+}
+
+async function saveFileVersion(
+  ctx: ToolContext,
+  file: { id: string; path: string; content: string | null }
+): Promise<void> {
+  try {
+    await ctx.supabase.from("file_versions").insert({
+      file_id: file.id,
+      project_id: ctx.projectId!,
+      path: file.path,
+      content: file.content,
+      size: file.content?.length ?? 0,
+      edited_by: "agent",
+    });
+  } catch {
+    // history is best-effort
+  }
+}
+
+async function runListFiles(ctx: ToolContext): Promise<ToolExecResult> {
+  if (!ctx.projectId) {
+    return projectFileError(
+      "No project is open. File tools need a project — ask the user to open one."
+    );
+  }
+  const { data, error } = await ctx.supabase
+    .from("project_files")
+    .select("path, size, content")
+    .eq("project_id", ctx.projectId)
+    .order("path", { ascending: true });
+  if (error) return projectFileError("Could not list project files.");
+  const files = (data ?? []).map((f) => ({
+    path: f.path,
+    size: f.size ?? (f.content?.length ?? 0),
+    kind: isTextPath(f.path) ? "text" : "binary",
+  }));
+  return { ok: true, result: { count: files.length, files } };
+}
+
+async function runReadFile(
+  ctx: ToolContext,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  args: Record<string, any>
+): Promise<ToolExecResult> {
+  if (!ctx.projectId) {
+    return projectFileError("No project is open. File tools need an active project.");
+  }
+  const path = String(args?.path ?? "").trim().replace(/^\/+/, "").slice(0, 400);
+  if (!path) return projectFileError("path is required.");
+  if (!isTextPath(path)) {
+    return projectFileError(
+      `"${path}" does not look like a text file. Only text files can be read or edited.`
+    );
+  }
+  const file = await loadProjectFile(ctx, path);
+  if (!file) return projectFileError(`No file at "${path}". Use list_files to see the tree.`);
+  return {
+    ok: true,
+    result: {
+      path: file.path,
+      size: file.size ?? file.content?.length ?? 0,
+      content: (file.content ?? "").slice(0, 100000),
+    },
+  };
+}
+
+async function runWriteFile(
+  ctx: ToolContext,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  args: Record<string, any>
+): Promise<ToolExecResult> {
+  if (!ctx.projectId) {
+    return projectFileError("No project is open. File tools need an active project.");
+  }
+  const path = String(args?.path ?? "").trim().replace(/^\/+/, "").slice(0, 400);
+  const content = typeof args?.content === "string" ? args.content : "";
+  if (!path) return projectFileError("path is required.");
+  if (!isTextPath(path)) {
+    return projectFileError(
+      `"${path}" is not a supported text file type. Text files only (ts/py/json/yaml/md/env/Dockerfile/…).`
+    );
+  }
+  if (content.length > 300000) return projectFileError("File content too large (300k char limit).");
+
+  const existing = await loadProjectFile(ctx, path);
+  if (existing) await saveFileVersion(ctx, existing);
+
+  if (existing) {
+    await ctx.supabase
+      .from("project_files")
+      .update({ content, size: content.length, updated_at: new Date().toISOString() })
+      .eq("id", existing.id);
+  } else {
+    await ctx.supabase.from("project_files").insert({
+      project_id: ctx.projectId,
+      path,
+      content,
+      size: content.length,
+    });
+  }
+  console.log(JSON.stringify({ event: "file_written", path, created: !existing }));
+  return {
+    ok: true,
+    result: { written: true, path, created: !existing, size: content.length },
+  };
+}
+
+async function runEditFile(
+  ctx: ToolContext,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  args: Record<string, any>
+): Promise<ToolExecResult> {
+  if (!ctx.projectId) {
+    return projectFileError("No project is open. File tools need an active project.");
+  }
+  const path = String(args?.path ?? "").trim().replace(/^\/+/, "").slice(0, 400);
+  const oldString = typeof args?.old_string === "string" ? args.old_string : "";
+  const newString = typeof args?.new_string === "string" ? args.new_string : "";
+  if (!path || !oldString) return projectFileError("path and old_string are required.");
+  if (!isTextPath(path)) {
+    return projectFileError(`"${path}" is not a supported text file type.`);
+  }
+  const file = await loadProjectFile(ctx, path);
+  if (!file) return projectFileError(`No file at "${path}". Use list_files first.`);
+  const current = file.content ?? "";
+  if (!current.includes(oldString)) {
+    const probe = oldString.split("\n")[0].slice(0, 80);
+    const near = current.split("\n").findIndex((l) => probe && l.includes(probe));
+    return projectFileError(
+      `old_string not found in "${path}".` +
+        (near >= 0
+          ? ` A similar line exists at line ${near + 1}; read the file and retry with exact text.`
+          : " Read the file and retry with exact text.")
+    );
+  }
+  const occurrences = current.split(oldString).length - 1;
+  if (occurrences > 1) {
+    return projectFileError(
+      `old_string appears ${occurrences} times in "${path}". Include more surrounding context so it is unique.`
+    );
+  }
+  await saveFileVersion(ctx, file);
+  const next = current.replace(oldString, newString);
+  await ctx.supabase
+    .from("project_files")
+    .update({ content: next, size: next.length, updated_at: new Date().toISOString() })
+    .eq("id", file.id);
+  console.log(JSON.stringify({ event: "file_edited", path }));
+  return {
+    ok: true,
+    result: { edited: true, path, replaced: oldString.length, inserted: newString.length },
+  };
+}
+
+async function runDeleteFile(
+  ctx: ToolContext,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  args: Record<string, any>
+): Promise<ToolExecResult> {
+  if (!ctx.projectId) {
+    return projectFileError("No project is open. File tools need an active project.");
+  }
+  const path = String(args?.path ?? "").trim().replace(/^\/+/, "").slice(0, 400);
+  if (!path) return projectFileError("path is required.");
+  const file = await loadProjectFile(ctx, path);
+  if (!file) return projectFileError(`No file at "${path}".`);
+  await saveFileVersion(ctx, file);
+  await ctx.supabase.from("project_files").delete().eq("id", file.id);
+  console.log(JSON.stringify({ event: "file_deleted", path }));
+  return { ok: true, result: { deleted: true, path } };
 }

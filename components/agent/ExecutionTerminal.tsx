@@ -66,6 +66,8 @@ interface TerminalProps {
 const EVENT_STYLE: Record<AgentEvent["kind"], string> = {
   agent_started: "text-kore-accent",
   memory_retrieved: "text-sky-300",
+  files_context: "text-emerald-300",
+  skill_loaded: "text-violet-300",
   tool_call: "text-kore-warn",
   tool_completed: "text-kore-muted",
   provider_fallback: "text-kore-warn",

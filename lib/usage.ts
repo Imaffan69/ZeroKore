@@ -3,6 +3,14 @@ import type { UsageState } from "@/types";
 
 export const DAILY_LIMIT = 15;
 
+/**
+ * The daily cap is switched off for now, so nobody is blocked while the product
+ * is still being built out. Requests are still counted — the counter is what
+ * makes usage visible in the UI and in Settings — and the limit can be turned
+ * back on by flipping this to `true`.
+ */
+export const ENFORCE_DAILY_LIMIT = false;
+
 function todayUTC(): string {
   return new Date().toISOString().slice(0, 10);
 }
@@ -67,7 +75,7 @@ export async function checkAndIncrementUsage(
     used = row.requests_today ?? 0;
   }
 
-  if (used >= DAILY_LIMIT) {
+  if (ENFORCE_DAILY_LIMIT && used >= DAILY_LIMIT) {
     return {
       allowed: false,
       isAdmin: false,
@@ -84,8 +92,37 @@ export async function checkAndIncrementUsage(
   return {
     allowed: true,
     isAdmin: false,
-    usage: { used: next, limit: DAILY_LIMIT, unlimited: false },
+    usage: { used: next, limit: DAILY_LIMIT, unlimited: !ENFORCE_DAILY_LIMIT },
   };
+}
+
+/**
+ * Give a counted request back.
+ *
+ * A call that failed — provider down, credit exhausted, model retired — did not
+ * produce anything, so charging the user for it would be wrong. The counter is
+ * decremented (never below zero) and the caller keeps the corrected snapshot.
+ */
+export async function refundUsage(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: SupabaseClient<any>,
+  userId: string,
+  usage: UsageState
+): Promise<UsageState> {
+  if (usage.unlimited) return usage;
+  const today = todayUTC();
+  const current = await getUsageState(supabase, userId);
+  // Only refund a request charged today, and only if one is actually pending.
+  const next = Math.max(0, Math.min(current.used, usage.used) - 1);
+  try {
+    await supabase
+      .from("user_usage")
+      .update({ requests_today: next, last_request_date: today })
+      .eq("user_id", userId);
+  } catch {
+    // Best-effort: a failed refund must never mask the original error.
+  }
+  return { used: next, limit: DAILY_LIMIT, unlimited: false };
 }
 
 /** Read-only usage snapshot for UI display (no increment). */
@@ -112,11 +149,11 @@ export async function getUsageState(
     .maybeSingle();
 
   if (!row || row.last_request_date !== today) {
-    return { used: 0, limit: DAILY_LIMIT, unlimited: false };
+    return { used: 0, limit: DAILY_LIMIT, unlimited: !ENFORCE_DAILY_LIMIT };
   }
   return {
     used: row.requests_today ?? 0,
     limit: DAILY_LIMIT,
-    unlimited: false,
+    unlimited: !ENFORCE_DAILY_LIMIT,
   };
 }

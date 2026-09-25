@@ -6,13 +6,32 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { Terminal, Loader2, AlertCircle, ShieldCheck, Github, Mail } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { normalizeUsername, usernameError } from "@/lib/username";
+import { cn } from "@/lib/utils";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
+/** Explicit OAuth redirect URL. When unset, falls back to window.location.origin
+ * plus our callback path. Set this in env if your Supabase redirect URL is
+ * different from the page origin (e.g. a custom domain or a specific callback). */
+const SUPABASE_OAUTH_REDIRECT = process.env.NEXT_PUBLIC_SUPABASE_OAUTH_REDIRECT;
+
 /** True when the Supabase client can be constructed at all. */
 function isConfigured(): boolean {
   return !!(SUPABASE_URL && SUPABASE_ANON);
+}
+
+/** Build the OAuth redirect target. If SUPABASE_OAUTH_REDIRECT is set, use it
+ * as-is. Otherwise construct from the current origin + callback path. */
+function oauthRedirectTarget(next: string): string {
+  if (SUPABASE_OAUTH_REDIRECT) {
+    const url = new URL(SUPABASE_OAUTH_REDIRECT);
+    // Append next query param, preserving any existing params on the configured URL.
+    url.searchParams.set("next", next);
+    return url.toString();
+  }
+  return `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
 }
 
 /** Translate raw auth failures into concise, actionable copy. */
@@ -39,12 +58,18 @@ function validateEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
+/** The public shape of a ZeroKore URL, shown live while typing a username. */
+export function publicUrlPreview(username: string): string {
+  return `zerokore.vercel.app/${username || "your-name"}/project-name`;
+}
+
 export default function AuthForm({ mode }: { mode: Mode }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = searchParams.get("next") || "/dashboard";
 
   const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -54,6 +79,8 @@ export default function AuthForm({ mode }: { mode: Mode }) {
   const [oauthBusy, setOauthBusy] = useState<"google" | "github" | null>(null);
 
   const isSignup = mode === "signup";
+  // Live username feedback, using the exact rules the API and database apply.
+  const usernameProblem = username ? usernameError(username) : null;
 
   // Detect server auth configuration on mount so the form can explain
   // itself instead of failing with a raw fetch error on submit.
@@ -61,14 +88,26 @@ export default function AuthForm({ mode }: { mode: Mode }) {
     setConfigured(isConfigured());
   }, []);
 
+  // Surface OAuth callback failures (?error=...) as an inline, human message.
+  useEffect(() => {
+    const oauthErr = searchParams.get("error");
+    if (oauthErr) setError(oauthErr);
+  }, [searchParams]);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setInfo(null);
 
-    const cleanEmail = email.trim().toLowerCase();
-    if (!validateEmail(cleanEmail)) {
-      setError("Please enter a valid email address.");
+    const identifier = email.trim().toLowerCase();
+    const isUsernameLogin = !isSignup && identifier !== "" && !identifier.includes("@");
+
+    if (!isUsernameLogin && !validateEmail(identifier)) {
+      setError("Please enter a valid email address, or your username.");
+      return;
+    }
+    if (isSignup && usernameProblem) {
+      setError(usernameProblem);
       return;
     }
     if (password.length < 8) {
@@ -93,8 +132,11 @@ export default function AuthForm({ mode }: { mode: Mode }) {
       const supabase = createClient();
       if (isSignup) {
         const { error: signUpError } = await supabase.auth.signUp({
-          email: cleanEmail,
+          email: identifier,
           password,
+          // The chosen username is stored on the account; a database trigger
+          // claims it (or derives one) when the profile row is created.
+          options: { data: { username: normalizeUsername(username) } },
         });
         if (signUpError) {
           if (/already|exists|duplicate/i.test(signUpError.message)) {
@@ -113,10 +155,25 @@ export default function AuthForm({ mode }: { mode: Mode }) {
           router.push(next);
           router.refresh();
         }
+      } else if (isUsernameLogin) {
+        // Usernames are resolved server-side; the password is still verified by
+        // Supabase Auth, never by our own code.
+        const res = await fetch("/api/auth/username-login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ identifier, password }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setError(data?.error ?? "Could not sign in. Try again.");
+          return;
+        }
+        router.push(next);
+        router.refresh();
       } else {
         const { error: signInError } =
           await supabase.auth.signInWithPassword({
-            email: cleanEmail,
+            email: identifier,
             password,
           });
         if (signInError) {
@@ -172,9 +229,12 @@ export default function AuthForm({ mode }: { mode: Mode }) {
 
   async function supabaseSignIn(provider: "google" | "github") {
     const supabase = createClient();
+    // Always return through our callback so the PKCE code is exchanged
+    // server-side before landing on the destination page.
+    const redirectTo = oauthRedirectTarget(next);
     return supabase.auth.signInWithOAuth({
       provider,
-      options: { redirectTo: `${window.location.origin}${next}` },
+      options: { redirectTo },
     });
   }
 
@@ -231,18 +291,49 @@ export default function AuthForm({ mode }: { mode: Mode }) {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+        {isSignup && (
+          <div>
+            <label htmlFor="username" className="mb-1.5 block text-sm font-medium">
+              Username
+            </label>
+            <input
+              id="username"
+              type="text"
+              autoComplete="username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              disabled={loading}
+              placeholder="your-name"
+              aria-invalid={!!usernameProblem}
+              aria-describedby="username-help"
+              className="glass-subtle w-full rounded-2xl px-4 py-2.5 font-mono text-sm text-kore-text placeholder:text-kore-muted/60 focus:border-kore-accent disabled:opacity-60"
+            />
+            <p
+              id="username-help"
+              className={cn(
+                "mt-1.5 font-mono text-[11px]",
+                usernameProblem ? "text-kore-warn" : "text-kore-muted"
+              )}
+            >
+              {usernameProblem ??
+                (username
+                  ? publicUrlPreview(normalizeUsername(username))
+                  : "Your projects live at zerokore.vercel.app/<username>/<project>")}
+            </p>
+          </div>
+        )}
         <div>
           <label htmlFor="email" className="mb-1.5 block text-sm font-medium">
-            Email
+            {isSignup ? "Email" : "Username or email"}
           </label>
           <input
             id="email"
-            type="email"
-            autoComplete="email"
+            type="text"
+            autoComplete={isSignup ? "email" : "username"}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             disabled={loading}
-            placeholder="you@example.com"
+            placeholder={isSignup ? "you@example.com" : "your-name or you@example.com"}
             className="glass-subtle w-full rounded-2xl px-4 py-2.5 text-sm text-kore-text placeholder:text-kore-muted/60 focus:border-kore-accent disabled:opacity-60"
           />
         </div>
