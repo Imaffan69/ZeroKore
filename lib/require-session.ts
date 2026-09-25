@@ -4,15 +4,34 @@ import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 
 /** Returns the current user (or null) without redirecting.
+ *
  * Use this for hidden/role-gated routes where an anonymous visitor should see
- * an ordinary 404 rather than a login redirect. */
-export async function getSession(): Promise<User | null> {
-  await cookies();
+ * an ordinary 404 rather than a login redirect.
+ *
+ * Pass the `Request` when the caller may be a non-browser client (the CLI or
+ * the desktop app), which authenticates with an `Authorization: Bearer` token
+ * instead of a cookie. */
+export async function getSession(req?: Request): Promise<User | null> {
   let user: User | null = null;
+
+  const header = req?.headers.get("authorization") ?? "";
+  const bearer = header.toLowerCase().startsWith("bearer ")
+    ? header.slice(7).trim()
+    : "";
+
   try {
-    const supabase = await createClient();
-    const { data } = await supabase.auth.getUser();
-    user = data.user;
+    if (bearer) {
+      // No cookie jar in a CLI/agent: verify the token against Supabase.
+      const { createBearerClient } = await import("@/lib/supabase/server");
+      const client = await createBearerClient(bearer);
+      const { data } = await client.auth.getUser();
+      user = data.user;
+    } else {
+      await cookies();
+      const supabase = await createClient();
+      const { data } = await supabase.auth.getUser();
+      user = data.user;
+    }
   } catch {
     user = null;
   }

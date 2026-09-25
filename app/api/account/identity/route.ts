@@ -18,9 +18,9 @@ export const dynamic = "force-dynamic";
  * page instead of bouncing the user around. Authorisation for everything else
  * still happens in `requireUser()`; this route exposes nothing privileged.
  */
-export async function GET() {
+export async function GET(req: Request) {
   try {
-    const user = await getSession();
+    const user = await getSession(req);
     if (!user) {
       return NextResponse.json(
         { error: "Authentication required." },
