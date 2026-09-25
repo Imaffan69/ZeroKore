@@ -865,6 +865,7 @@ function Footer() {
           <Link href="/desktop" className="transition-colors hover:text-white">Desktop</Link>
           <Link href="/#engine" className="transition-colors hover:text-white">Engine</Link>
           <Link href="/skills" className="transition-colors hover:text-white">Skills</Link>
+          <Link href="/music" className="transition-colors hover:text-white">Music</Link>
           <Link href="/pricing" className="transition-colors hover:text-white">Pricing</Link>
           <Link href="/earn" className="transition-colors hover:text-white">Earn</Link>
           <Link href="/students" className="transition-colors hover:text-white">Students</Link>
