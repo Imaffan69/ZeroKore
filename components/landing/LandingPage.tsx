@@ -21,6 +21,7 @@ import {
   Zap,
 } from "lucide-react";
 import ParticleField from "@/components/visual/ParticleField";
+import ProductDemo from "@/components/landing/ProductDemo";
 import SavingsCalculator from "@/components/landing/SavingsCalculator";
 import CreditsPerDay from "@/components/landing/CreditsPerDay";
 import { EASE, fadeUp, staggerGroup } from "@/lib/motion";
@@ -310,7 +311,7 @@ function Hero({ totalUsers }: { totalUsers: number | null }) {
           className="mt-6 max-w-2xl text-base leading-relaxed text-kore-body sm:text-lg"
         >
           Start a project from nothing, import any repository you own, then edit
-          real files, run commands, review what changed and push it back to Git —
+          real files, run commands, review what changed and push it back to Git â€”
           with a four-model AI agent doing the heavy lifting beside you.
         </motion.p>
 
@@ -351,7 +352,7 @@ function Hero({ totalUsers }: { totalUsers: number | null }) {
             </span>
           )}
           <span>
-            No credit card · Your projects live at zerokore.vercel.app/&lt;you&gt;/&lt;project&gt;
+            No credit card Â· Your projects live at zerokore.vercel.app/&lt;you&gt;/&lt;project&gt;
           </span>
         </motion.p>
 
@@ -390,36 +391,8 @@ function Hero({ totalUsers }: { totalUsers: number | null }) {
           transition={{ duration: 0.8, ease: EASE, delay: 0.3 }}
           className="relative lg:mt-2"
         >
-          <div className="glass overflow-hidden rounded-2xl text-left shadow-2xl shadow-black">
-            <div className="flex items-center gap-1.5 border-b border-white/10 px-4 py-3">
-              <span className="h-2.5 w-2.5 rounded-full bg-[#ff5f57]" aria-hidden />
-              <span className="h-2.5 w-2.5 rounded-full bg-[#febc2e]" aria-hidden />
-              <span className="h-2.5 w-2.5 rounded-full bg-[#28c840]" aria-hidden />
-              <span className="ml-3 hidden gap-1.5 sm:flex" role="tablist" aria-label="Workspace preview">
-                {["Preview", "Code", "Terminal", "Changes"].map((t, i) => (
-                  <span
-                    key={t}
-                    role="tab"
-                    aria-selected={i === 0}
-                    className={cn(
-                      "rounded-full px-3 py-1 text-[11px]",
-                      i === 0 ? "bg-[#b5cfa0]/20 text-[#e8f3df]" : "text-kore-muted"
-                    )}
-                  >
-                    {t}
-                  </span>
-                ))}
-              </span>
-            </div>
-            <div className="space-y-1.5 px-5 py-4 font-mono text-[12px] leading-relaxed">
-              <p className="text-kore-muted">
-                <span className="text-[#4ade80]">$</span> agent &quot;add a pricing section&quot;
-              </p>
-              <p className="text-kore-text">Read 6 files · mapped components/pricing</p>
-              <p className="text-[#b5cfa0]">Edit pricing.tsx +48 −6 · saved</p>
-              <p className="text-kore-text">Preview updated · pushed to main · 4f2a1de</p>
-            </div>
-          </div>
+          {/* An operable miniature of the workspace, not a picture of one. */}
+          <ProductDemo />
         </motion.div>
       </div>
 
@@ -470,7 +443,7 @@ const FEATURES = [
   {
     icon: FileCode2,
     title: "A real editor over real files",
-    body: "Open, edit and save the project's actual files in a full code editor, with upload and download. Saving writes the bytes — there is no draft copy to forget about.",
+    body: "Open, edit and save the project's actual files in a full code editor, with upload and download. Saving writes the bytes â€” there is no draft copy to forget about.",
   },
   {
     icon: Terminal,
@@ -485,7 +458,7 @@ const FEATURES = [
   {
     icon: Github,
     title: "GitHub in and out",
-    body: "Connect once, import any repository you own — files, folders, branch — work on it here, then push your changes back to a branch you choose, with a real commit message.",
+    body: "Connect once, import any repository you own â€” files, folders, branch â€” work on it here, then push your changes back to a branch you choose, with a real commit message.",
   },
   {
     icon: Layers,
@@ -495,15 +468,15 @@ const FEATURES = [
   {
     icon: KeyRound,
     title: "Secrets that stay secret",
-    body: "Project environment variables are encrypted before they are stored and read only on the server. The browser sees key names, never values — and no key is ever logged.",
+    body: "Project environment variables are encrypted before they are stored and read only on the server. The browser sees key names, never values â€” and no key is ever logged.",
   },
 ] as const;
 
 const INTEGRATIONS = [
-  { icon: Github, name: "GitHub", note: "OAuth · import · push" },
-  { icon: Database, name: "Supabase", note: "Postgres · Auth · storage" },
-  { icon: Boxes, name: "Groq · DeepSeek", note: "fast inference" },
-  { icon: Boxes, name: "SambaNova · Gemini", note: "long context" },
+  { icon: Github, name: "GitHub", note: "OAuth Â· import Â· push" },
+  { icon: Database, name: "Supabase", note: "Postgres Â· Auth Â· storage" },
+  { icon: Boxes, name: "Groq Â· DeepSeek", note: "fast inference" },
+  { icon: Boxes, name: "SambaNova Â· Gemini", note: "long context" },
   { icon: Code2, name: "Monaco", note: "the editor VS Code uses" },
 ] as const;
 
@@ -571,20 +544,20 @@ const STEPS = [
   {
     n: "01",
     title: "Start or import",
-    body: "Create an empty project, or connect GitHub and pull in a repository you already own. Files arrive as real, editable content — never a screenshot of code.",
-    mock: "repo you/landing-page → 42 files",
+    body: "Create an empty project, or connect GitHub and pull in a repository you already own. Files arrive as real, editable content â€” never a screenshot of code.",
+    mock: "repo you/landing-page â†’ 42 files",
   },
   {
     n: "02",
     title: "Build with the agent",
     body: "Describe the change in plain language. The agent plans, calls its tools, writes files and streams every step to you as it happens.",
-    mock: "wrote src/app/page.tsx · 1.2 kB",
+    mock: "wrote src/app/page.tsx Â· 1.2 kB",
   },
   {
     n: "03",
     title: "Ship it",
     body: "Watch it run in the preview, read what changed, then push to a branch. Your history stays yours, and it stays in Git.",
-    mock: "pushed to main · commit 4f2a1de",
+    mock: "pushed to main Â· commit 4f2a1de",
   },
 ] as const;
 
@@ -638,7 +611,7 @@ const LOOP = [
   {
     icon: Sparkles,
     title: "It plans and picks its tools",
-    body: "The agent decides what it needs — searching the web, recalling what it learned about your project, writing a file, or generating a component — and calls those tools itself, up to a fixed ceiling so a run can never spiral.",
+    body: "The agent decides what it needs â€” searching the web, recalling what it learned about your project, writing a file, or generating a component â€” and calls those tools itself, up to a fixed ceiling so a run can never spiral.",
   },
   {
     icon: Terminal,
@@ -648,7 +621,7 @@ const LOOP = [
   {
     icon: Layers,
     title: "Design knowledge, built in",
-    body: "The agent carries a library of engineering and design skills — motion, layout, accessibility, React patterns, copy — and applies them while it writes, so the result is a considered interface rather than a wall of divs.",
+    body: "The agent carries a library of engineering and design skills â€” motion, layout, accessibility, React patterns, copy â€” and applies them while it writes, so the result is a considered interface rather than a wall of divs.",
   },
 ] as const;
 
@@ -664,7 +637,7 @@ function Agentic() {
             </h2>
             <p className="mt-4 text-base leading-relaxed text-kore-muted">
               A chatbot answers. An agent acts: it holds a goal, chooses tools,
-              observes the result, and corrects itself until the work is done —
+              observes the result, and corrects itself until the work is done â€”
               visibly, and with a hard limit on how far it can go.
             </p>
             <p className="mt-4 text-base leading-relaxed text-kore-muted">
@@ -819,7 +792,7 @@ function Cta() {
             </h2>
             <p className="mx-auto mt-4 max-w-xl text-base text-kore-muted">
               Create an account, claim your username, and get a workspace with
-              an editor, terminal, agent and Git — in the browser, for free.
+              an editor, terminal, agent and Git â€” in the browser, for free.
             </p>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
               <Link
@@ -875,7 +848,7 @@ function Footer() {
           <Link href="/terms" className="transition-colors hover:text-white">Terms</Link>
         </nav>
         <p className="font-mono text-xs text-kore-faint">
-          © {new Date().getFullYear()} ZeroKore
+          Â© {new Date().getFullYear()} ZeroKore
         </p>
       </div>
     </footer>
@@ -912,7 +885,7 @@ function Replaces() {
           </h2>
           <p className="mt-4 text-base leading-relaxed text-kore-muted">
             One workspace instead of four subscriptions. Each surface of
-            ZeroKore stands in for a paid tool — and stays free while we grow.
+            ZeroKore stands in for a paid tool â€” and stays free while we grow.
           </p>
         </Reveal>
 
@@ -952,13 +925,13 @@ function BlogTeaser() {
     {
       category: "ENGINEERING",
       title: "How the agent edits your files: versions, diffs, Changes",
-      excerpt: "Every edit snapshots the previous content, so the Changes tab shows a true +/− diff.",
+      excerpt: "Every edit snapshots the previous content, so the Changes tab shows a true +/âˆ’ diff.",
       href: "/blog",
     },
     {
       category: "COMPARISONS",
       title: "ZeroKore vs Copilot Pro vs Cursor: what $0 gets you",
-      excerpt: "Agent autonomy, file editing, workspaces and price — side by side.",
+      excerpt: "Agent autonomy, file editing, workspaces and price â€” side by side.",
       href: "/blog",
     },
   ];
@@ -1011,7 +984,7 @@ function VersionBlock({ version }: { version: string }) {
         <Reveal>
           <div className="glass flex flex-col items-start justify-between gap-3 rounded-2xl px-5 py-4 sm:flex-row sm:items-center">
             <p className="font-mono text-[11px] tracking-[0.14em] text-kore-muted">
-              ZEROKORE <span className="text-white">v{version}</span> · CREDITS ENGINE LIVE
+              ZEROKORE <span className="text-white">v{version}</span> Â· CREDITS ENGINE LIVE
             </p>
             <Link
               href="/changelog"
