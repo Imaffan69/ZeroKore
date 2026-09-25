@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Activity, Globe, Loader2, RefreshCw, Radio } from "lucide-react";
+import VisitorMap, { type MapPoint } from "@/components/admin/VisitorMap";
 
 interface SecurityEvent {
   user_id: string;
@@ -79,6 +80,37 @@ export default function AdminSecurity() {
     return () => clearInterval(id);
   }, [live, load]);
 
+  /**
+   * Events that carry real coordinates, newest first.
+   *
+   * `detail.latitude` is written by the geolocation lookup. Rows recorded before
+   * that ran have no coordinates and are left off the map rather than being
+   * snapped to a country centroid, which would draw a pin somewhere the user
+   * has never been.
+   */
+  const mapPoints: MapPoint[] = useMemo(() => {
+    if (!data) return [];
+    const out: MapPoint[] = [];
+    for (const e of data.events) {
+      const d = (e.detail ?? {}) as Record<string, unknown>;
+      const lat = typeof d.latitude === "number" ? d.latitude : null;
+      const lon = typeof d.longitude === "number" ? d.longitude : null;
+      if (lat === null || lon === null) continue;
+      out.push({
+        id: `${e.created_at}-${e.user_id}`,
+        user: e.user,
+        event: e.event,
+        country: e.country,
+        city: e.city,
+        ip: e.ip,
+        latitude: lat,
+        longitude: lon,
+        at: e.created_at,
+      });
+    }
+    return out;
+  }, [data]);
+
   if (loading)
     return <Loader2 className="mx-auto mt-16 h-6 w-6 animate-spin text-kore-muted" />;
   if (error) return <p className="text-sm text-red-300">{error}</p>;
@@ -155,6 +187,10 @@ export default function AdminSecurity() {
           </button>
         </div>
       </div>
+
+      {/* World map — plotted from the coordinates ipgeolocation.io resolved for
+          each event. Rows without a coordinate are skipped, never guessed. */}
+      <VisitorMap points={mapPoints} />
 
       {/* Country histogram */}
       <div className="glass rounded-2xl p-4">

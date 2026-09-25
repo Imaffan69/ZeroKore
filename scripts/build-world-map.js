@@ -1,0 +1,223 @@
+"use strict";
+
+/**
+ * Generate the world map outline used by the admin visitor map.
+ *
+ * Run once at development time: `node scripts/build-world-map.js`.
+ *
+ * Why bake it instead of loading a map library at runtime:
+ *  - a mapping SDK needs an API key, a network call and a third-party script on
+ *    an admin page, all of which leak a visitor's viewing behaviour elsewhere;
+ *  - the map is a static illustration, not an interactive globe, so the whole
+ *    continent outline is a few kB of SVG path data.
+ *
+ * Source: world-atlas 110m (Natural Earth, public domain), converted from
+ * TopoJSON to GeoJSON, projected to plain equirectangular, simplified, and
+ * emitted as `lib/world-map.ts`. Equirectangular is deliberate: it is a plain
+ * x/y mapping of lon/lat, so a marker needs two lines of maths and no
+ * projection library.
+ */
+
+const fs = require("fs");
+const path = require("path");
+const https = require("https");
+
+const SOURCE = "https://unpkg.com/world-atlas@2.0.2/countries-110m.json";
+const OUT = path.join(__dirname, "..", "lib", "world-map.ts");
+/** ViewBox is 1000x500: 2 units per degree, so full lon/lat maps linearly. */
+const W = 1000;
+const H = 500;
+
+/** TopoJSON arc decoding â€” minimal, for this one file. */
+function topoToGeoJSON(topo) {
+  const { scale, translate } = topo.transform;
+  const arcs = topo.arcs.map((arc) => {
+    let x = 0;
+    let y = 0;
+    return arc.map(([dx, dy]) => {
+      x += dx;
+      y += dy;
+      return [x * scale[0] + translate[0], y * scale[1] + translate[1]];
+    });
+  });
+
+  function ring(indices) {
+    const points = [];
+    for (const i of indices) {
+      const arc = i < 0 ? arcs[~i].slice().reverse() : arcs[i];
+      // Consecutive arcs share an endpoint; drop the duplicate.
+      points.push(...(points.length ? arc.slice(1) : arc));
+    }
+    return points;
+  }
+
+  function geometryOf(g) {
+    if (g.type === "Polygon") return { type: "Polygon", coordinates: g.arcs.map(ring) };
+    if (g.type === "MultiPolygon") {
+      return { type: "MultiPolygon", coordinates: g.arcs.map((p) => p.map(ring)) };
+    }
+    return null;
+  }
+
+  return topo.objects.countries.geometries.map(geometryOf).filter(Boolean);
+}
+
+/** Ramerâ€“Douglasâ€“Peucker, to keep the baked file small. */
+function simplify(points, tolerance) {
+  if (points.length < 3) return points;
+  const sqTol = tolerance * tolerance;
+
+  function sqSegDist(p, a, b) {
+    let x = a[0];
+    let y = a[1];
+    let dx = b[0] - x;
+    let dy = b[1] - y;
+    if (dx !== 0 || dy !== 0) {
+      const t = ((p[0] - x) * dx + (p[1] - y) * dy) / (dx * dx + dy * dy);
+      if (t > 1) {
+        x = b[0];
+        y = b[1];
+      } else if (t > 0) {
+        x += dx * t;
+        y += dy * t;
+      }
+    }
+    dx = p[0] - x;
+    dy = p[1] - y;
+    return dx * dx + dy * dy;
+  }
+
+  const keep = new Uint8Array(points.length);
+  keep[0] = 1;
+  keep[points.length - 1] = 1;
+  const stack = [[0, points.length - 1]];
+  while (stack.length) {
+    const [first, last] = stack.pop();
+    let maxSq = 0;
+    let index = -1;
+    for (let i = first + 1; i < last; i += 1) {
+      const sq = sqSegDist(points[i], points[first], points[last]);
+      if (sq > maxSq) {
+        maxSq = sq;
+        index = i;
+      }
+    }
+    if (maxSq > sqTol && index > 0) {
+      keep[index] = 1;
+      stack.push([first, index], [index, last]);
+    }
+  }
+  return points.filter((_, i) => keep[i]);
+}
+
+/** Equirectangular projection into the 1000x500 viewBox. */
+function project([lon, lat]) {
+  return [
+    ((Number(lon.toFixed(2)) + 180) / 360) * W,
+    ((90 - Number(lat.toFixed(2))) / 180) * H,
+  ];
+}
+
+function ringToPath(points) {
+  if (!points.length) return "";
+  const first = project(points[0]);
+  let d = "M" + first[0] + " " + first[1];
+  for (let i = 1; i < points.length; i += 1) {
+    const p = project(points[i]);
+    d += "L" + p[0] + " " + p[1];
+  }
+  return d + "Z";
+}
+
+function fetchJson(url) {
+  return new Promise((resolve, reject) => {
+    https
+      .get(url, { headers: { "User-Agent": "zerokore-build" } }, (res) => {
+        let body = "";
+        res.on("data", (c) => (body += c));
+        res.on("end", () => {
+          try {
+            resolve(JSON.parse(body));
+          } catch (err) {
+            reject(err);
+          }
+        });
+      })
+      .on("error", reject);
+  });
+}
+
+async function main() {
+  console.log("fetching world-atlas 110m...");
+  const topo = await fetchJson(SOURCE);
+  const geo = topoToGeoJSON(topo);
+
+  const paths = [];
+  for (const feature of geo) {
+    const polygons =
+      feature.type === "Polygon" ? [feature.coordinates] : feature.coordinates;
+    for (const polygon of polygons) {
+      for (const ring of polygon) {
+        const simplified = simplify(ring, 0.8);
+        if (simplified.length > 3) {
+          const d = ringToPath(simplified);
+          if (d) paths.push(d);
+        }
+      }
+    }
+  }
+
+  const header = [
+    "/**",
+    " * World outline for the admin visitor map.",
+    " *",
+    " * GENERATED by scripts/build-world-map.js - do not edit by hand.",
+    " * Source: world-atlas 110m (Natural Earth, public domain).",
+    " *",
+    " * Equirectangular, so a point maps to the viewBox in two lines:",
+    " *   x = ((lon + 180) / 360) * " + W,
+    " *   y = ((90 - lat) / 180) * " + H,
+    " */",
+    "",
+    "export const MAP_WIDTH = " + W + ";",
+    "export const MAP_HEIGHT = " + H + ";",
+    "",
+    "export const WORLD_PATHS: string[] = " + JSON.stringify(paths) + ";",
+    "",
+    "/** Project a coordinate into the viewBox. Returns null for unusable values. */",
+    "export function projectPoint(",
+    "  lat: number | null | undefined,",
+    "  lon: number | null | undefined",
+    "): { x: number; y: number } | null {",
+    "  if (",
+    "    typeof lat !== \"number\" ||",
+    "    typeof lon !== \"number\" ||",
+    "    !Number.isFinite(lat) ||",
+    "    !Number.isFinite(lon) ||",
+    "    lat < -90 ||",
+    "    lat > 90 ||",
+    "    lon < -180 ||",
+    "    lon > 180",
+    "  ) {",
+    "    return null;",
+    "  }",
+    "  return {",
+    "    x: ((lon + 180) / 360) * " + W + ",",
+    "    y: ((90 - lat) / 180) * " + H + ",",
+    "  };",
+    "}",
+    "",
+  ].join("\n");
+
+  fs.writeFileSync(OUT, header, "utf8");
+  console.log(
+    "wrote " + path.relative(process.cwd(), OUT) + " - " + paths.length +
+    " rings, " + (header.length / 1024).toFixed(1) + " kB"
+  );
+}
+
+main().catch((err) => {
+  console.error("failed:", err.message);
+  process.exit(1);
+});
+
