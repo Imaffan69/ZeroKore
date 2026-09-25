@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Sparkles, Briefcase, GitBranch, Settings } from "lucide-react";
 import ProjectsNavigator from "@/components/projects/ProjectsNavigator";
 import { requireSession } from "@/lib/require-session";
 import { ensureProfile } from "@/lib/profiles";
@@ -45,7 +44,7 @@ export default async function DashboardPage() {
       {/* Quick actions strip */}
       <section className="mt-6 grid gap-3 px-6 pb-8 sm:grid-cols-2 lg:grid-cols-4">
         <QuickActionCard
-          icon={Sparkles}
+          icon="sparkles"
           title="New project"
           description="Start from a blank workspace or import a GitHub repo"
           // The create/import chooser lives on the dashboard itself (the
@@ -54,7 +53,7 @@ export default async function DashboardPage() {
           href="/dashboard"
         />
         <QuickActionCard
-          icon={Briefcase}
+          icon="briefcase"
           title="Your workspaces"
           description={
             username ? `/${username} · your named address` : "Set a username to get one"
@@ -62,13 +61,13 @@ export default async function DashboardPage() {
           href={username ? `/${username}` : "/settings"}
         />
         <QuickActionCard
-          icon={GitBranch}
+          icon="github"
           title="Connect GitHub"
           description="Link a GitHub account to import and push repos"
           href="/settings"
         />
         <QuickActionCard
-          icon={Settings}
+          icon="settings"
           title="Settings & account"
           description="Models, integrations, username and account details"
           href="/settings"

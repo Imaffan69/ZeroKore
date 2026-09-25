@@ -2,22 +2,55 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import type { LucideIcon } from "lucide-react";
+import {
+  Sparkles,
+  Briefcase,
+  GitBranch,
+  Settings,
+  FolderPlus,
+  Github,
+  FolderOpen,
+  Cpu,
+  type LucideIcon,
+} from "lucide-react";
 import { fadeUp } from "@/lib/motion";
 
+/**
+ * Icon keys, not components.
+ *
+ * This card is a Client Component rendered from a Server Component, and a
+ * component reference is not serialisable: passing `icon={Sparkles}` across the
+ * RSC boundary throws "Functions cannot be passed directly to Client Components"
+ * (lucide icons are forwardRef objects, hence `$$typeof`/`render`/`displayName`).
+ * The caller sends a plain string and the icon is resolved here, on the client.
+ */
+const ICONS: Record<string, LucideIcon> = {
+  sparkles: Sparkles,
+  briefcase: Briefcase,
+  git: GitBranch,
+  settings: Settings,
+  folderPlus: FolderPlus,
+  github: Github,
+  folder: FolderOpen,
+  cpu: Cpu,
+};
+
+export type QuickActionIcon = keyof typeof ICONS;
+
 interface QuickActionCardProps {
-  icon: LucideIcon;
+  icon: QuickActionIcon;
   title: string;
   description: string;
   href: string;
 }
 
 export default function QuickActionCard({
-  icon: Icon,
+  icon,
   title,
   description,
   href,
 }: QuickActionCardProps) {
+  const Icon = ICONS[icon] ?? Sparkles;
   return (
     <motion.div
       variants={fadeUp}
