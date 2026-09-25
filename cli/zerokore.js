@@ -223,9 +223,20 @@ commands.cat = async (slug, filePath) => {
   console.log(one.content || "");
 };
 
-commands.ask = async (prompt) => {
-  if (!prompt) fail('Usage: zerokore ask "<what you want>"');
+commands.ask = async (prompt, projectSlug) => {
+  if (!prompt) fail('Usage: zerokore ask "<what you want>" [--project <slug>]');
   console.log(C.dim + "thinking..." + C.reset);
+
+  // Resolve the project when asked, so the agent runs with real file context.
+  let projectId = null;
+  if (projectSlug) {
+    const body = await api("/api/projects");
+    const found = (body.projects || []).find(function (p) {
+      return p.slug === projectSlug;
+    });
+    if (!found) fail("No project with slug " + projectSlug);
+    projectId = found.id;
+  }
 
   const res = await fetch(BASE + "/api/agent", {
     method: "POST",
@@ -233,42 +244,44 @@ commands.ask = async (prompt) => {
       "Content-Type": "application/json",
       Authorization: "Bearer " + (loadConfig().accessToken || ""),
     },
-    body: JSON.stringify({ message: prompt, mode: "coding" }),
+    body: JSON.stringify({ message: prompt, mode: "coding", projectId: projectId }),
   });
 
-  if (!res.ok || !res.body) {
-    const text = await res.text().catch(() => "");
-    fail("Agent failed (" + res.status + "): " + text.slice(0, 200));
+  const text = await res.text();
+  if (!res.ok) {
+    let msg = text.slice(0, 200);
+    try {
+      msg = JSON.parse(text).error || msg;
+    } catch (e) {
+      /* not JSON */
+    }
+    fail("Agent failed (" + res.status + "): " + msg);
   }
 
-  // The agent streams newline-delimited events; print them readably.
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  for (;;) {
-    const chunk = await reader.read();
-    if (chunk.done) break;
-    buffer += decoder.decode(chunk.value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() || "";
-    for (const line of lines) {
-      if (!line.trim()) continue;
-      try {
-        const event = JSON.parse(line);
-        if (event.kind === "completed") {
-          console.log("\n" + C.bold + (event.text || "") + C.reset);
-        } else if (event.kind === "error") {
-          console.error(C.red + (event.message || "") + C.reset);
-        } else {
-          console.log(C.dim + "- " + (event.message || "") + C.reset);
-        }
-      } catch {
-        console.log(line);
+  // The endpoint answers with a single JSON object; the agent's progress lives
+  // in `events` and the answer in `reply`.
+  let body;
+  try {
+    body = JSON.parse(text);
+  } catch (e) {
+    fail("Could not read the agent response.");
+  }
+
+  if (body.events) {
+    for (const event of body.events) {
+      if (event.kind === "agent_started") continue;
+      if (event.kind === "error") {
+        console.log(C.red + "! " + event.message + C.reset);
+      } else {
+        console.log(C.dim + "- " + event.message + C.reset);
       }
     }
   }
+  if (body.provider) {
+    console.log(C.dim + "via " + body.provider + C.reset);
+  }
+  console.log("\n" + C.bold + (body.reply || "") + C.reset);
 };
-
 commands.help = () => {
   console.log([
     "",
