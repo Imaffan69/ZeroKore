@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { requireUser, errorResponse } from "@/lib/api-auth";
 import {
   checkAndIncrementUsage,
   refundUsage,
@@ -79,24 +79,16 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Non-browser callers (CLI, desktop app, scripts) authenticate with a bearer
+  // token; browsers use the cookie session. requireUser resolves either and
+  // applies the same suspension and maintenance rules as every other route.
+  // It throws rather than returning, so the mapping happens here.
   let supabase;
+  let user;
   try {
-    supabase = await createClient();
-  } catch {
-    return NextResponse.json(
-      { error: "Server misconfigured. Contact the administrator." },
-      { status: 500 }
-    );
-  }
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json(
-      { error: "Authentication required." },
-      { status: 401 }
-    );
+    ({ supabase, user } = await requireUser(req));
+  } catch (err) {
+    return errorResponse(err);
   }
 
   // Ownership check for project runs: an unowned or unknown project id is
@@ -118,8 +110,8 @@ export async function POST(req: NextRequest) {
     projectId = requestedProjectId;
   }
 
-  // Continuous activity capture: the owner sees agent traffic (IP · approximate
-  // location · device) as it happens, not only at sign-in. Fire-and-forget so a
+  // Continuous activity capture: the owner sees agent traffic (IP Â· approximate
+  // location Â· device) as it happens, not only at sign-in. Fire-and-forget so a
   // logging failure can never slow down or break a run.
   void logActivity(user.id, "agent_run", req, {
     mode,
@@ -138,7 +130,7 @@ export async function POST(req: NextRequest) {
     console.log(JSON.stringify({ event: "usage_increment_failed" }));
     usageState = await getUsageState(supabase, user.id).catch(() => undefined);
   }
-  // Reporting state only — a failed read must never fail the run.
+  // Reporting state only â€” a failed read must never fail the run.
   const usage: UsageState = usageState ?? { used: 0, limit: 0, unlimited: true };
 
   // Credits: reserve the base cost up-front, settle with real token counts
@@ -151,7 +143,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "You are out of credits for today. They reset at midnight UTC — or upgrade your plan, earn credits via referrals and feedback, or verify as a student for +50/day.",
+            "You are out of credits for today. They reset at midnight UTC â€” or upgrade your plan, earn credits via referrals and feedback, or verify as a student for +50/day.",
           outOfCredits: true,
           balance: err.available,
         },
@@ -193,7 +185,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Settle the run with real token counts (reserve → true cost, logged).
+    // Settle the run with real token counts (reserve â†’ true cost, logged).
     try {
       await settleRun(supabase, user.id, result.promptTokens, result.completionTokens, {
         conversationId: result.conversationId,
@@ -228,7 +220,7 @@ export async function POST(req: NextRequest) {
     } catch {
       // best-effort
     }
-    // Provider/config failures → 502; internal validation → 400/500.
+    // Provider/config failures â†’ 502; internal validation â†’ 400/500.
     const status = /provider|configured|model/i.test(msg) ? 502 : 500;
     return NextResponse.json(
       {
