@@ -718,6 +718,7 @@ export default function LandingPage() {
                 links: [
                   { label: "Health", href: "/api/health" },
                   { label: "Status", href: "#security" },
+                  { label: "Music", href: "/music" },
                 ],
               },
               {
