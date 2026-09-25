@@ -13,11 +13,15 @@ import {
   OPENROUTER_DEFAULT_MODEL,
   OPENROUTER_BASE,
   openRouterProviderName,
-  parseOpenRouterProvider,
   isOpenRouterConfigured,
   availableOpenRouterModels,
-
 } from "@/lib/ai/openrouter";
+import {
+  customModels,
+  customModelIdFromName,
+  resetModelCache,
+  type CustomModel,
+} from "@/lib/ai/custom-models";
 
 export interface ChatMsg {
   role: "system" | "user" | "assistant" | "tool";
@@ -124,17 +128,29 @@ function providers(): ProviderDef[] {
 
 /**
  * Every selectable model, including the OpenRouter entries that are not part of
- * the automatic cascade. Used to populate the model picker.
+ * the automatic cascade, plus anything an admin registered.
+ *
+ * Admin-registered models deliberately never join the automatic cascade: they
+ * are opt-in by the person who configured them, so they only run when a user
+ * explicitly picks one.
  */
-function selectableProviders(): ProviderDef[] {
+async function selectableProviders(): Promise<ProviderDef[]> {
   const list = providers();
-  if (!isOpenRouterConfigured()) return list;
-  const key = process.env.OPENROUTER_API_KEY;
-  for (const m of availableOpenRouterModels()) {
+  if (isOpenRouterConfigured()) {
+    const key = process.env.OPENROUTER_API_KEY;
+    for (const m of availableOpenRouterModels()) {
+      list.push({
+        name: openRouterProviderName(m.id),
+        model: m.id,
+        apiKey: key,
+      });
+    }
+  }
+  for (const m of await customModels()) {
     list.push({
-      name: openRouterProviderName(m.id),
+      name: `Custom:${m.id}`,
       model: m.id,
-      apiKey: key,
+      apiKey: process.env[m.apiKeyEnv],
     });
   }
   return list;
@@ -147,42 +163,33 @@ export function configuredProviders(): string[] {
 }
 
 /** Model-picker rows for the client: which models have keys behind them. */
-export function providerCatalog(): {
-  id: string;
-  label: string;
-  model: string;
-  configured: boolean;
-  group?: string;
-}[] {
-  const rows: {
+export async function providerCatalog(): Promise<
+  {
     id: string;
     label: string;
     model: string;
     configured: boolean;
     group?: string;
-  }[] = MODEL_REGISTRY.map((entry) => ({
-    id: entry.id,
-    label: entry.label,
-    model: entry.model,
-    configured: selectableProviders().some(
-      (d) => d.name === entry.id && !!d.apiKey
-    ),
-  }));
-
-  if (isOpenRouterConfigured()) {
-    const key = process.env.OPENROUTER_API_KEY;
-    for (const m of availableOpenRouterModels()) {
-      rows.push({
-        id: openRouterProviderName(m.id),
-        label: `${m.label}${m.free ? " · free" : ""}`,
-        model: m.id,
-        configured: !!key,
-        group: m.group,
-      });
-    }
-  }
-
-  return rows;
+  }[]
+> {
+  const all = await selectableProviders();
+  const openRouterLabels = new Map(
+    availableOpenRouterModels().map((m) => [m.id, m])
+  );
+  return all.map((d) => {
+    const known = openRouterLabels.get(d.model);
+    return {
+      id: d.name,
+      label: known
+        ? `${known.label}${known.free ? " · free" : ""}`
+        : MODEL_REGISTRY.find((r) => r.id === d.name)?.label ?? d.model,
+      model: d.model,
+      configured: !!d.apiKey,
+      group: d.name.startsWith("Custom:")
+        ? "Added by admin"
+        : known?.group,
+    };
+  });
 }
 
 class RetryableError extends Error {
@@ -656,9 +663,32 @@ async function callProvider(
   if (p.name === "Gemini") {
     return callGemini(p.apiKey!, p.model, messages, tools, timeoutMs);
   }
-  const openRouter = parseOpenRouterProvider(p.name);
+
+  // An admin-registered model can be either shape, and names its own upstream.
+  const customId = customModelIdFromName(p.name);
+  if (customId) {
+    const custom = (await customModels()).find((m) => m.id === customId);
+    if (!custom) {
+      throw new RetryableError("That model is no longer registered.");
+    }
+    if (custom.kind === "gemini") {
+      return callGemini(p.apiKey!, custom.id, messages, tools, timeoutMs);
+    }
+    return callOpenAICompatible(
+      custom.baseUrl!,
+      p.apiKey!,
+      custom.id,
+      messages,
+      tools,
+      timeoutMs
+    );
+  }
+
+  const openRouterModel = availableOpenRouterModels().find(
+    (m) => p.name === openRouterProviderName(m.id)
+  );
   return callOpenAICompatible(
-    openRouter ? OPENROUTER_BASE : OPENAI_BASES[p.name],
+    openRouterModel ? OPENROUTER_BASE : OPENAI_BASES[p.name],
     p.apiKey!,
     p.model,
     messages,
@@ -697,16 +727,25 @@ export async function chatWithCascade(
   if (opts?.preferred && opts.preferred !== "auto") {
     // `selectableProviders()` is used here (not `providers()`) so an OpenRouter
     // model other than the cascade default can still be pinned explicitly.
-    const picked = selectableProviders().find(
-      (p) => p.name.toLowerCase() === opts.preferred!.toLowerCase()
-    );
+    const picked = (
+      await selectableProviders()
+    ).find((p) => p.name.toLowerCase() === opts.preferred!.toLowerCase());
     if (!picked) {
       throw new FatalError(`Unknown model "${opts.preferred}".`);
     }
     if (!picked.apiKey) {
-      const parsed = parseOpenRouterProvider(picked.name);
+      // Point at the env var an admin-registered model needs, so the message is
+      // actionable instead of just "not configured".
+      const customId = customModelIdFromName(picked.name);
+      const custom = customId
+        ? (await customModels()).find((m) => m.id === customId)
+        : null;
       throw new FatalError(
-        `${parsed ? parsed.label : picked.name} is not configured on the server. Pick another model or add the ${parsed ? "OPENROUTER_API_KEY" : picked.name} key.`
+        `${picked.name} is not configured on the server.${
+          custom
+            ? ` Add the ${custom.apiKeyEnv} environment variable and redeploy.`
+            : ` Pick another model, or add the ${picked.name} API key.`
+        }`
       );
     }
     try {

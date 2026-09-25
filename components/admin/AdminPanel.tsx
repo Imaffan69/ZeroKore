@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { BarChart3, Users, MessageSquare, Megaphone, ShieldAlert, Globe, LogOut, UserCog } from "lucide-react";
+import { BarChart3, Users, MessageSquare, Megaphone, ShieldAlert, Globe, LogOut, UserCog, Cpu } from "lucide-react";
 import { cn } from "@/lib/utils";
 import AdminOverview from "@/components/admin/AdminOverview";
 import AdminUsers from "@/components/admin/AdminUsers";
@@ -10,9 +10,10 @@ import AdminAnnouncements from "@/components/admin/AdminAnnouncements";
 import AdminControl from "@/components/admin/AdminControl";
 import AdminSecurity from "@/components/admin/AdminSecurity";
 import AdminStaff from "@/components/admin/AdminStaff";
+import AdminModels from "@/components/admin/AdminModels";
 import AdminLoginForm from "@/components/admin/AdminLoginForm";
 
-type Tab = "overview" | "users" | "security" | "feedback" | "announcements" | "staff" | "control";
+type Tab = "overview" | "users" | "security" | "feedback" | "announcements" | "models" | "staff" | "control";
 
 /**
  * Each tab declares the minimum staff rank that may open it. The matching API
@@ -33,6 +34,7 @@ const TABS: {
   { id: "announcements", label: "Announcements", icon: Megaphone, min: "moderator" },
   { id: "users", label: "Users", icon: Users, min: "admin" },
   { id: "security", label: "Security & IPs", icon: Globe, min: "admin" },
+  { id: "models", label: "Models", icon: Cpu, min: "admin" },
   { id: "control", label: "Site control", icon: ShieldAlert, min: "admin" },
   { id: "staff", label: "Staff accounts", icon: UserCog, min: "owner" },
 ];
@@ -141,6 +143,7 @@ export default function AdminPanel({
         {activeTab === "security" && <AdminSecurity />}
         {activeTab === "feedback" && <AdminFeedback />}
         {activeTab === "announcements" && <AdminAnnouncements />}
+        {activeTab === "models" && <AdminModels />}
         {activeTab === "control" && <AdminControl isOwner={isOwner} />}
         {activeTab === "staff" && <AdminStaff />}
       </main>

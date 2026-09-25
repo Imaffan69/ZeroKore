@@ -15,7 +15,7 @@ import { isAdminConfigured, listAdminAccounts } from "@/lib/admin-auth";
  * unlisted, and publishing staff addresses here would defeat that.
  */
 export async function GET() {
-  const models = providerCatalog();
+  const models = await providerCatalog();
   const github =
     !!process.env.GITHUB_CLIENT_ID && !!process.env.GITHUB_CLIENT_SECRET;
   const owners = ownerEmails().length;
