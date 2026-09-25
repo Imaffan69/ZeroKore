@@ -1,12 +1,5 @@
-import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
-import {
-  OPENROUTER_MODELS,
-  OPENROUTER_BASE,
-  openRouterProviderName,
-  availableOpenRouterModels,
-  isOpenRouterConfigured,
-} from "@/lib/ai/openrouter";
+import { OPENROUTER_BASE } from "@/lib/ai/openrouter";
 
 export interface CustomModel {
   id: string;
@@ -105,37 +98,6 @@ export function resetModelCache(): void {
  * The complete model list shown to users: four built-in providers, the built-in
  * OpenRouter catalogue, and anything an admin registered.
  */
-export async function fullModelCatalog(): Promise<
-  {
-    id: string;
-    label: string;
-    model: string;
-    configured: boolean;
-    group?: string;
-  }[]
-> {
-  const custom = await customModels();
-  const extra: {
-    id: string;
-    label: string;
-    model: string;
-    configured: boolean;
-    group?: string;
-  }[] = [];
-
-  for (const m of custom) {
-    extra.push({
-      id: `Custom:${m.id}`,
-      label: m.label,
-      model: m.id,
-      configured: true,
-      group: m.group ?? "Added by admin",
-    });
-  }
-
-  return extra;
-}
-
 /** Whether a provider name refers to an admin-registered model. */
 export function isCustomProviderName(name: string): boolean {
   return name.toLowerCase().startsWith("custom:");

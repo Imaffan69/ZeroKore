@@ -48,7 +48,10 @@ export default async function DashboardPage() {
           icon={Sparkles}
           title="New project"
           description="Start from a blank workspace or import a GitHub repo"
-          href={username ? `/${username}/new` : "/dashboard"}
+          // The create/import chooser lives on the dashboard itself (the
+          // navigator's own panels), and there is no /[username]/new route —
+          // linking there produced a 404.
+          href="/dashboard"
         />
         <QuickActionCard
           icon={Briefcase}

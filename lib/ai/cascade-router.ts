@@ -19,8 +19,6 @@ import {
 import {
   customModels,
   customModelIdFromName,
-  resetModelCache,
-  type CustomModel,
 } from "@/lib/ai/custom-models";
 
 export interface ChatMsg {

@@ -6,14 +6,12 @@ import { LogIn, GitBranch, FileText, Zap, Plus, CheckCircle } from "lucide-react
 import { fadeUp } from "@/lib/motion";
 
 interface ActivityEvent {
-  id: number;
-  occurred_at: string;
   event: string;
-  email: string;
   ip?: string | null;
   city?: string | null;
   country?: string | null;
-  browser?: string | null;
+  userAgent?: string | null;
+  createdAt?: string | null;
 }
 
 interface ActivityFeedProps {
@@ -47,20 +45,20 @@ export default function ActivityFeed({ username }: ActivityFeedProps) {
           items
             .slice(0, 8)
             .map((e: Record<string, unknown>) => ({
-              id: Number(e.id) || 0,
-              occurred_at: String(e.occurred_at ?? ""),
+              // These are the column names /api/account/events actually selects.
+              // The feed previously read `occurred_at`, `email` and `browser`,
+              // none of which exist on login_events, so every row rendered blank.
               event: String(e.event ?? "login"),
-              email: String(e.email ?? ""),
+              createdAt: String(e.created_at ?? ""),
               ip: e.ip as string | null | undefined,
               city: e.city as string | null | undefined,
               country: e.country as string | null | undefined,
-              browser: e.browser as string | null | undefined,
+              userAgent: e.user_agent as string | null | undefined,
             }))
             .sort(
-              (
-                a: { occurred_at: string | null | undefined },
-                b: { occurred_at: string | null | undefined }
-              ) => new Date(b.occurred_at ?? "").getTime() - new Date(a.occurred_at ?? "").getTime()
+              (a: ActivityEvent, b: ActivityEvent) =>
+                new Date(b.createdAt ?? "").getTime() -
+                new Date(a.createdAt ?? "").getTime()
             )
         );
       } catch {
@@ -107,17 +105,21 @@ export default function ActivityFeed({ username }: ActivityFeedProps) {
       <div className="flex flex-col gap-3">
         {events.map((event, i) => {
           const Icon = eventIcons[event.event] ?? LogIn;
-          const date = new Date(event.occurred_at);
-          const timeStr = date.toLocaleString(undefined, {
-            month: "short",
-            day: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-          });
+          // Guard the parse: an unparseable timestamp must not throw and blank
+          // the whole feed.
+          const parsed = new Date(event.createdAt ?? "");
+          const timeStr = Number.isNaN(parsed.getTime())
+            ? "recently"
+            : parsed.toLocaleString(undefined, {
+                month: "short",
+                day: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              });
 
           return (
             <motion.div
-              key={event.id}
+              key={`${event.event}-${event.createdAt}-${i}`}
               variants={fadeUp}
               initial="hidden"
               animate="visible"
