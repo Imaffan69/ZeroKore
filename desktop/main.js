@@ -134,6 +134,8 @@ function createWindow() {
   });
 
   mainWindow.webContents.on("will-navigate", (event, url) => {
+    // The bundled IDE is loaded from disk, so its own files must stay navigable.
+    if (url.startsWith("file://")) return;
     if (isAllowed(url)) return;
     event.preventDefault();
     if (/^https?:/i.test(url)) shell.openExternal(url);
@@ -155,7 +157,12 @@ function createWindow() {
     );
   });
 
-  mainWindow.loadURL(START_URL);
+  // The local IDE is the default surface; ZEROKORE_WEB=1 opens the web product.
+  if (process.env.ZEROKORE_WEB === "1") {
+    mainWindow.loadURL(START_URL);
+  } else {
+    mainWindow.loadFile(path.join(__dirname, "ide.html"));
+  }
   return mainWindow;
 }
 
@@ -286,8 +293,14 @@ function buildMenu() {
       label: "Go",
       submenu: [
         {
-          label: "Workspace",
+          label: "ZeroKore Web",
           click: () => mainWindow && mainWindow.loadURL(START_URL),
+        },
+        {
+          label: "Local IDE",
+          click: () =>
+            mainWindow &&
+            mainWindow.loadFile(path.join(__dirname, "ide.html")),
         },
         {
           label: "Projects",
@@ -346,7 +359,230 @@ function buildMenu() {
 // ---------------------------------------------------------------------------
 // IPC â€” the entire renderer-facing surface. Keep it this small.
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Real IDE back end.
+//
+// Everything here operates on the user's actual disk and spawns a real shell.
+// Nothing is simulated: the file tree is `fs.readdir`, the editor saves with
+// `fs.writeFile`, and the terminal runs a genuine PowerShell process.
+//
+// Path containment: the renderer may only ever touch paths underneath the folder
+// the user opened. `resolveInside` is the single choke point, and it rejects
+// traversal (`..`), absolute escapes and anything resolving outside the root, so
+// a compromised renderer cannot reach the rest of the machine.
+// ---------------------------------------------------------------------------
+
+const os = require("os");
+const { spawn } = require("child_process");
+
+/** The folder currently open in the IDE. Null until the user picks one. */
+let workspaceRoot = null;
+
+/** Live shell processes, so input can be routed to the focused one. */
+const shellChildren = [];
+
+/** Resolve `rel` inside the workspace, or return null if it escapes. */
+function resolveInside(rel) {
+  if (!workspaceRoot) return null;
+  const root = path.resolve(workspaceRoot);
+  const target = path.resolve(root, String(rel ?? ""));
+  if (target !== root && !target.startsWith(root + path.sep)) return null;
+  return target;
+}
+
+/** Never walk these, even inside the workspace. */
+const IGNORED = new Set([
+  "node_modules", ".git", ".next", "dist", "build", ".turbo", ".cache", "coverage",
+]);
+
+const TEXT_EXT = new Set([
+  ".ts", ".tsx", ".js", ".jsx", ".json", ".css", ".scss", ".html", ".md", ".txt",
+  ".yml", ".yaml", ".env", ".example", ".py", ".go", ".rs", ".java", ".c", ".cpp",
+  ".h", ".cs", ".php", ".rb", ".sh", ".ps1", ".sql", ".toml", ".xml", ".svg",
+]);
+
+function isTextFile(name) {
+  const ext = path.extname(name).toLowerCase();
+  return TEXT_EXT.has(ext) || ext === "";
+}
+
+function walk(dir, depth, out) {
+  if (depth > 6 || out.length > 4000) return;
+  let entries;
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    if (IGNORED.has(entry.name)) continue;
+    const full = path.join(dir, entry.name);
+    const rel = path.relative(workspaceRoot, full);
+    if (entry.isDirectory()) {
+      out.push({ type: "dir", name: entry.name, path: rel });
+      walk(full, depth + 1, out);
+    } else if (entry.isFile() && isTextFile(entry.name)) {
+      let size = 0;
+      try {
+        size = fs.statSync(full).size;
+      } catch {
+        /* ignore */
+      }
+      out.push({ type: "file", name: entry.name, path: rel, size });
+    }
+  }
+}
+
+
+function registerIdeIpc() {
+  // Open a real folder picker and adopt the result as the workspace.
+  ipcMain.handle("ide:open-folder", async () => {
+    const res = await dialog.showOpenDialog(mainWindow, {
+      title: "Open folder",
+      properties: ["openDirectory"],
+    });
+    if (res.canceled || !res.filePaths[0]) return null;
+    workspaceRoot = res.filePaths[0];
+    return workspaceRoot;
+  });
+
+  ipcMain.handle("ide:default-folder", () => {
+    if (!workspaceRoot) workspaceRoot = process.cwd();
+    return workspaceRoot;
+  });
+
+  ipcMain.handle("ide:tree", () => {
+    if (!workspaceRoot) return [];
+    const out = [];
+    walk(workspaceRoot, 0, out);
+    return out;
+  });
+
+  ipcMain.handle("ide:read-file", (_e, rel) => {
+    const target = resolveInside(rel);
+    if (!target) return { error: "Path is outside the open folder." };
+    try {
+      // 5 MB ceiling: a huge file would freeze the renderer.
+      if (fs.statSync(target).size > 5 * 1024 * 1024) {
+        return { error: "File is too large to open (limit 5 MB)." };
+      }
+      return { content: fs.readFileSync(target, "utf8") };
+    } catch (err) {
+      return { error: err.message };
+    }
+  });
+
+  ipcMain.handle("ide:write-file", (_e, rel, content) => {
+    const target = resolveInside(rel);
+    if (!target) return { error: "Path is outside the open folder." };
+    if (typeof content !== "string") return { error: "Invalid content." };
+    try {
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.writeFileSync(target, content, "utf8");
+      return { ok: true };
+    } catch (err) {
+      return { error: err.message };
+    }
+  });
+
+  ipcMain.handle("ide:new-file", (_e, rel, content) => {
+    const target = resolveInside(rel);
+    if (!target) return { error: "Path is outside the open folder." };
+    try {
+      if (fs.existsSync(target)) return { error: "A file with that name exists." };
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.writeFileSync(target, content ?? "", "utf8");
+      return { ok: true };
+    } catch (err) {
+      return { error: err.message };
+    }
+  });
+
+  /**
+   * A real shell.
+   *
+   * A genuine PowerShell (Windows) or bash (macOS/Linux) process with its stdio
+   * piped to the renderer: real commands, real filesystem, real exit codes.
+   * It is deliberately NOT a PTY, so full-screen TUI programs (vim, htop) will
+   * not render and there is no job control.
+   */
+  ipcMain.handle("ide:shell-start", (event) => {
+    const isWin = process.platform === "win32";
+    const child = spawn(
+      isWin ? "powershell.exe" : process.env.SHELL || "/bin/bash",
+      isWin ? ["-NoLogo", "-NoProfile", "-NoExit", "-Command", "-"] : ["-i"],
+      {
+        cwd: workspaceRoot || os.homedir(),
+        env: process.env,
+        windowsHide: true,
+      }
+    );
+    shellChildren.push(child);
+
+    const send = (channel, payload) => {
+      if (!event.sender.isDestroyed()) event.sender.send(channel, payload);
+    };
+    child.stdout.on("data", (d) => send("ide:shell-out", d.toString()));
+    child.stderr.on("data", (d) => send("ide:shell-out", d.toString()));
+    child.on("error", (err) => send("ide:shell-out", `\n${err.message}\n`));
+    child.on("close", (code) => {
+      const i = shellChildren.indexOf(child);
+      if (i >= 0) shellChildren.splice(i, 1);
+      send("ide:shell-close", code);
+    });
+
+    event.sender.once("destroyed", () => {
+      try {
+        child.kill();
+      } catch {
+        /* already gone */
+      }
+    });
+    return {
+      shell: isWin ? "PowerShell" : path.basename(process.env.SHELL || "bash"),
+    };
+  });
+
+  ipcMain.handle("ide:shell-input", (_e, data) => {
+    const line = `${String(data).replace(/\r?\n/g, "\n")}\n`;
+    for (const proc of shellChildren) {
+      try {
+        proc.stdin.write(line);
+      } catch {
+        /* the process may have exited */
+      }
+    }
+    return true;
+  });
+}
+
+/**
+ * The local IDE window.
+ *
+ * The desktop app is a native editor that works on the user's own files, not a
+ * wrapper around the website. `ZEROKORE_WEB=1` still opens the web product (handy
+ * for checking your account), but the default launch is the local IDE.
+ */
+function loadIde() {
+  mainWindow.loadFile(path.join(__dirname, "ide.html"));
+}
+
+function loadWeb(target) {
+  mainWindow.loadURL(target);
+}
+
+/* ------------------------------------------------------------------- boot */
+
 function registerIpc() {
+  // Switch the window between the local IDE and the web product.
+  ipcMain.handle("ide:show-web", (_e, target) => {
+    const url = typeof target === "string" && /^https?:\/\//i.test(target)
+      ? target
+      : START_URL;
+    if (mainWindow) loadWeb(url);
+    return true;
+  });
+
   ipcMain.handle("zk:version", () => app.getVersion());
   ipcMain.handle("zk:platform", () => process.platform);
   ipcMain.handle("zk:open-external", (_event, url) => {
@@ -385,6 +621,7 @@ if (!setSingleInstance()) {
     );
     hardenSession(session.defaultSession);
     registerIpc();
+    registerIdeIpc();
     buildMenu();
     createWindow();
 

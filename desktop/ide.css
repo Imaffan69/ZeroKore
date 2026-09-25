@@ -1,0 +1,208 @@
+/* ZeroKore Desktop — local IDE.
+   Pure black, matching the web product. No web fonts: the app must work offline. */
+
+:root {
+  --bg: #000;
+  --panel: #0a0a0a;
+  --line: rgba(255, 255, 255, 0.1);
+  --text: #e8e8e8;
+  --muted: #8a8a8a;
+  --accent: #b5cfa0;
+  --mint: #4ade80;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  overflow: hidden;
+}
+
+body { display: flex; flex-direction: column; }
+
+/* ------------------------------------------------------------- title bar */
+.titlebar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 42px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+  flex: 0 0 auto;
+}
+
+.dot { width: 10px; height: 10px; border-radius: 999px; }
+.dot.red { background: #ff5f57; }
+.dot.amber { background: #febc2e; }
+.dot.green { background: #28c840; }
+
+.spacer { flex: 1; }
+
+.folder-btn, .save, .mini {
+  font: inherit;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease;
+}
+.folder-btn:hover, .save:hover:not(:disabled), .mini:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.save {
+  background: var(--mint);
+  color: #000;
+  border-color: transparent;
+  font-weight: 600;
+}
+.save:disabled { opacity: 0.4; cursor: default; }
+
+.root {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 46vw;
+}
+
+.status {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--accent);
+  text-transform: uppercase;
+}
+
+/* ---------------------------------------------------------------- layout */
+.layout {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  grid-template-rows: 1fr 220px;
+  grid-template-areas: "explorer editor" "explorer terminal";
+}
+
+.explorer { grid-area: explorer; border-right: 1px solid var(--line); min-height: 0; display: flex; flex-direction: column; }
+.editor-pane { grid-area: editor; min-height: 0; display: flex; flex-direction: column; }
+.terminal-pane { grid-area: terminal; border-top: 1px solid var(--line); min-height: 0; display: flex; flex-direction: column; background: #050505; }
+
+.pane-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+  flex: 0 0 auto;
+}
+.mini { padding: 1px 7px; font-size: 11px; line-height: 1.4; }
+.shell-name { color: var(--accent); letter-spacing: 0.08em; }
+
+/* ------------------------------------------------------------------ tree */
+.tree {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+  overflow: auto;
+  font-family: var(--mono);
+  font-size: 12px;
+  flex: 1;
+  min-height: 0;
+}
+.tree li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  cursor: pointer;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.tree li:hover { background: rgba(255, 255, 255, 0.05); color: var(--text); }
+.tree li.active { background: rgba(181, 207, 160, 0.14); color: var(--text); }
+.tree .glyph { width: 12px; text-align: center; opacity: 0.8; }
+.tree .dir { color: var(--text); }
+
+/* ---------------------------------------------------------------- editor */
+.tabs {
+  display: flex;
+  gap: 1px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--line);
+  flex: 0 0 auto;
+}
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  border-right: 1px solid var(--line);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.tab.active { color: var(--text); background: rgba(255, 255, 255, 0.05); }
+.tab .dotdirty { width: 7px; height: 7px; border-radius: 999px; background: var(--mint); }
+
+.editor { flex: 1; min-height: 0; }
+
+/* -------------------------------------------------------------- terminal */
+.terminal {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 10px 12px;
+  overflow: auto;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.55;
+  color: #cfcfcf;
+  white-space: pre-wrap;
+  word-break: break-word;
+  outline: none;
+}
+.terminal .err { color: #f87171; }
+.terminal .ok { color: var(--accent); }
+
+.prompt-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border-top: 1px solid var(--line);
+  flex: 0 0 auto;
+}
+.prompt-sign { color: var(--mint); font-family: var(--mono); font-weight: 700; }
+.cmd {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.cmd::placeholder { color: #555; }
+
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

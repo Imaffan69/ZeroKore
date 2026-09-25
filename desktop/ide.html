@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data:"
+    />
+    <title>ZeroKore Desktop</title>
+    <link rel="stylesheet" href="ide.css" />
+  </head>
+  <body>
+    <header class="titlebar">
+      <span class="dot red"></span><span class="dot amber"></span
+      ><span class="dot green"></span>
+      <button id="open-folder" class="folder-btn" type="button">Open folder…</button>
+      <span id="root-label" class="root">no folder open</span>
+      <span class="spacer"></span>
+      <button id="save" class="save" type="button" disabled>Save</button>
+      <span id="status" class="status">ready</span>
+    </header>
+
+    <main class="layout">
+      <!-- real filesystem -->
+      <aside class="explorer" aria-label="Explorer">
+        <div class="pane-head">
+          <span>EXPLORER</span>
+          <button id="refresh" class="mini" type="button" title="Refresh">⟳</button>
+        </div>
+        <ul id="tree" class="tree"></ul>
+      </aside>
+
+      <!-- real editor -->
+      <section class="editor-pane">
+        <div id="tabs" class="tabs"></div>
+        <div id="editor" class="editor"></div>
+      </section>
+
+      <!-- real shell -->
+      <section class="terminal-pane">
+        <div class="pane-head">
+          <span>TERMINAL</span>
+          <span id="shell-name" class="shell-name"></span>
+          <span class="spacer"></span>
+          <button id="clear-term" class="mini" type="button">Clear</button>
+        </div>
+        <pre id="terminal" class="terminal" tabindex="0"></pre>
+        <div class="prompt-row">
+          <span class="prompt-sign">&gt;</span>
+          <input
+            id="cmd"
+            class="cmd"
+            type="text"
+            autocomplete="off"
+            spellcheck="false"
+            aria-label="Terminal command"
+            placeholder="type a command and press Enter"
+          />
+        </div>
+      </section>
+    </main>
+
+    <!-- Monaco, served from the app's own node_modules. No CDN, no network. -->
+    <script src="../node_modules/monaco-editor/min/vs/loader.js"></script>
+    <script src="ide.js"></script>
+  </body>
+</html>
