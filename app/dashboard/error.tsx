@@ -23,14 +23,19 @@ export default function DashboardError({
   reset: () => void;
 }) {
   useEffect(() => {
-    // Server-side log so the real cause is available in the deployment logs.
-    console.error(
-      JSON.stringify({
-        event: "dashboard_render_failed",
+    // Report the failure server-side. Next.js redacts the message in production
+    // and a client console.error never reaches the deployment logs, so without
+    // this the cause of a render fault is invisible.
+    void fetch("/api/diag/dashboard-error", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
         message: error.message,
-        digest: error.digest ?? null,
-      })
-    );
+        stack: error.stack,
+        digest: error.digest,
+      }),
+      keepalive: true,
+    }).catch(() => undefined);
   }, [error]);
 
   return (
