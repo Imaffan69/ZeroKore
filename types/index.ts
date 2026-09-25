@@ -1,7 +1,18 @@
 export type AgentMode = "coding" | "research" | "general";
 
-/** The four configured AI providers. Users may pin one explicitly. */
-export type ProviderName = "Groq" | "DeepSeek" | "SambaNova" | "Gemini";
+/**
+ * A selectable AI model.
+ *
+ * The four dedicated providers are a closed set, but OpenRouter contributes many
+ * more as `OpenRouter:<model-id>` strings, so this cannot be a closed union
+ * without rejecting every OpenRouter model at the type level.
+ */
+export type ProviderName =
+  | "Groq"
+  | "DeepSeek"
+  | "SambaNova"
+  | "Gemini"
+  | (string & {});
 
 export type ProviderPreference = ProviderName | "auto";
 
@@ -83,6 +94,8 @@ export interface ProviderInfo {
   id: ProviderName;
   label: string;
   model: string;
+  /** Picker grouping for the OpenRouter entries (Coding / Reasoning / …). */
+  group?: string;
   configured: boolean;
 }
 

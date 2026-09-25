@@ -9,6 +9,16 @@
  * Server-side only. Never logs or returns API keys.
  */
 
+import {
+  OPENROUTER_DEFAULT_MODEL,
+  OPENROUTER_BASE,
+  openRouterProviderName,
+  parseOpenRouterProvider,
+  isOpenRouterConfigured,
+  availableOpenRouterModels,
+
+} from "@/lib/ai/openrouter";
+
 export interface ChatMsg {
   role: "system" | "user" | "assistant" | "tool";
   content: string;
@@ -69,7 +79,7 @@ export const MODEL_REGISTRY: { id: ProviderId; label: string; model: string }[] 
 ];
 
 function providers(): ProviderDef[] {
-  return [
+  const list: ProviderDef[] = [
     {
       name: "Groq",
       // llama-3.3-70b-versatile was retired by Groq; gpt-oss-120b is the
@@ -96,6 +106,38 @@ function providers(): ProviderDef[] {
       apiKey: process.env.GEMINI_API_KEY,
     },
   ];
+
+  // OpenRouter models are appended last so they are only reached by the cascade
+  // after the dedicated providers, and are never tried when no key is set.
+  // Only the default model joins the automatic cascade; the rest are reachable
+  // by explicit selection in the model picker.
+  if (isOpenRouterConfigured()) {
+    list.push({
+      name: openRouterProviderName(OPENROUTER_DEFAULT_MODEL),
+      model: OPENROUTER_DEFAULT_MODEL,
+      apiKey: process.env.OPENROUTER_API_KEY,
+    });
+  }
+
+  return list;
+}
+
+/**
+ * Every selectable model, including the OpenRouter entries that are not part of
+ * the automatic cascade. Used to populate the model picker.
+ */
+function selectableProviders(): ProviderDef[] {
+  const list = providers();
+  if (!isOpenRouterConfigured()) return list;
+  const key = process.env.OPENROUTER_API_KEY;
+  for (const m of availableOpenRouterModels()) {
+    list.push({
+      name: openRouterProviderName(m.id),
+      model: m.id,
+      apiKey: key,
+    });
+  }
+  return list;
 }
 
 export function configuredProviders(): string[] {
@@ -104,20 +146,43 @@ export function configuredProviders(): string[] {
     .map((p) => p.name);
 }
 
-/** Model-picker rows for the client: which of the four providers have keys. */
+/** Model-picker rows for the client: which models have keys behind them. */
 export function providerCatalog(): {
   id: string;
   label: string;
   model: string;
   configured: boolean;
+  group?: string;
 }[] {
-  const defs = providers();
-  return MODEL_REGISTRY.map((entry) => ({
+  const rows: {
+    id: string;
+    label: string;
+    model: string;
+    configured: boolean;
+    group?: string;
+  }[] = MODEL_REGISTRY.map((entry) => ({
     id: entry.id,
     label: entry.label,
     model: entry.model,
-    configured: defs.some((d) => d.name === entry.id && !!d.apiKey),
+    configured: selectableProviders().some(
+      (d) => d.name === entry.id && !!d.apiKey
+    ),
   }));
+
+  if (isOpenRouterConfigured()) {
+    const key = process.env.OPENROUTER_API_KEY;
+    for (const m of availableOpenRouterModels()) {
+      rows.push({
+        id: openRouterProviderName(m.id),
+        label: `${m.label}${m.free ? " · free" : ""}`,
+        model: m.id,
+        configured: !!key,
+        group: m.group,
+      });
+    }
+  }
+
+  return rows;
 }
 
 class RetryableError extends Error {
@@ -575,6 +640,34 @@ const OPENAI_BASES: Record<string, string> = {
 };
 
 /**
+ * Dispatch one chat turn to the right transport for a provider.
+ *
+ * Gemini uses its own generateContent shape; everything else is
+ * OpenAI-compatible. OpenRouter is OpenAI-compatible too, so it reuses that
+ * path with its own base URL — which is why 15 extra models needed no new
+ * request code.
+ */
+async function callProvider(
+  p: ProviderDef,
+  messages: ChatMsg[],
+  tools: ToolSpec[] | undefined,
+  timeoutMs: number
+): Promise<ProviderChatResult> {
+  if (p.name === "Gemini") {
+    return callGemini(p.apiKey!, p.model, messages, tools, timeoutMs);
+  }
+  const openRouter = parseOpenRouterProvider(p.name);
+  return callOpenAICompatible(
+    openRouter ? OPENROUTER_BASE : OPENAI_BASES[p.name],
+    p.apiKey!,
+    p.model,
+    messages,
+    tools,
+    timeoutMs
+  );
+}
+
+/**
  * Run one chat turn across the cascade. Returns the first successful result.
  *
  * `preferred` pins an exact provider (model selection like Freebuff/v0):
@@ -602,29 +695,22 @@ export async function chatWithCascade(
 
   // Explicit model selection: run ONLY the chosen provider.
   if (opts?.preferred && opts.preferred !== "auto") {
-    const picked = all.find(
+    // `selectableProviders()` is used here (not `providers()`) so an OpenRouter
+    // model other than the cascade default can still be pinned explicitly.
+    const picked = selectableProviders().find(
       (p) => p.name.toLowerCase() === opts.preferred!.toLowerCase()
     );
     if (!picked) {
       throw new FatalError(`Unknown model "${opts.preferred}".`);
     }
     if (!picked.apiKey) {
+      const parsed = parseOpenRouterProvider(picked.name);
       throw new FatalError(
-        `${picked.name} is not configured on the server. Pick another model or add the ${picked.name} API key.`
+        `${parsed ? parsed.label : picked.name} is not configured on the server. Pick another model or add the ${parsed ? "OPENROUTER_API_KEY" : picked.name} key.`
       );
     }
     try {
-      const result =
-        picked.name === "Gemini"
-          ? await callGemini(picked.apiKey, picked.model, messages, opts?.tools, timeoutMs)
-          : await callOpenAICompatible(
-              OPENAI_BASES[picked.name],
-              picked.apiKey,
-              picked.model,
-              messages,
-              opts?.tools,
-              timeoutMs
-            );
+      const result = await callProvider(picked, messages, opts?.tools, timeoutMs);
       console.log(
         JSON.stringify({ event: "provider_pinned", provider: picked.name })
       );
@@ -646,19 +732,7 @@ export async function chatWithCascade(
   for (const p of configured) {
     if (!firstTried) firstTried = p.name;
     try {
-      let result: ProviderChatResult;
-      if (p.name === "Gemini") {
-        result = await callGemini(p.apiKey!, p.model, messages, opts?.tools, timeoutMs);
-      } else {
-        result = await callOpenAICompatible(
-          OPENAI_BASES[p.name],
-          p.apiKey!,
-          p.model,
-          messages,
-          opts?.tools,
-          timeoutMs
-        );
-      }
+      const result = await callProvider(p, messages, opts?.tools, timeoutMs);
       console.log(
         JSON.stringify({
           event: p.name === firstTried ? "provider_selected" : "provider_fallback",

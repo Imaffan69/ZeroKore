@@ -47,6 +47,11 @@ export async function GET() {
       ? "configured"
       : "not configured",
     models,
+    // OpenRouter fronts many models behind one key, so it is summarised here
+    // rather than inflating the `models` list with every entry.
+    openrouter: process.env.OPENROUTER_API_KEY
+      ? `configured · ${models.filter((m) => m.id.startsWith("OpenRouter:")).length} models`
+      : "not configured",
     search: process.env.TAVILY_API_KEY ? "configured" : "not configured",
     github: github ? "configured" : "not configured",
     // Without a valid ENCRYPTION_KEY the Secrets environment refuses to store
