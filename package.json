@@ -3,11 +3,16 @@
   "version": "1.0.0",
   "private": true,
   "description": "ZeroKore — production-grade autonomous agentic AI platform",
+  "main": "desktop/main.js",
   "scripts": {
     "dev": "next dev -p 3000 -H 0.0.0.0",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "desktop": "electron desktop/main.js",
+    "desktop:icon": "node desktop/make-icon.js",
+    "desktop:package": "electron-builder --win --x64",
+    "desktop:dir": "electron-builder --win --x64 --dir"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
@@ -27,10 +32,52 @@
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
     "autoprefixer": "^10.4.20",
+    "electron": "^44.4.5",
+    "electron-builder": "^26.15.3",
     "eslint": "^9.17.0",
     "eslint-config-next": "^15.5.25",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.7.2"
+  },
+  "build": {
+    "appId": "app.zerokore.desktop",
+    "productName": "ZeroKore",
+    "directories": {
+      "output": "release",
+      "buildResources": "desktop/build"
+    },
+    "files": [
+      "desktop/**/*",
+      "package.json"
+    ],
+    "extraMetadata": {
+      "main": "desktop/main.js"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "desktop/build/icon.ico",
+      "artifactName": "ZeroKore-Desktop-${version}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "ZeroKore",
+      "installerLanguages": ["en_US"]
+    },
+    "protocols": [
+      {
+        "name": "ZeroKore",
+        "schemes": ["zerokore"]
+      }
+    ]
   }
 }
