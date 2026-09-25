@@ -21,6 +21,24 @@ export const metadata: Metadata = {
  * actions and recent activity.
  */
 export default async function DashboardPage() {
+  // TEMPORARY DIAGNOSTIC: surface the real server-render error in the HTML so
+  // it can be identified. Production redacts the message behind an error
+  // boundary, which makes the cause invisible.
+  try {
+    return <Dashboard />;
+  } catch (e) {
+    const err = e as Error;
+    return (
+      <pre style={{ color: "red", padding: 24, whiteSpace: "pre-wrap" }}>
+        {`DASHBOARD_RENDER_ERROR: ${err?.message ?? "unknown"}\n${
+          err?.stack ?? ""
+        }`}
+      </pre>
+    );
+  }
+}
+
+async function Dashboard() {
   const user = await requireSession("/dashboard");
 
   let username: string | null = null;
