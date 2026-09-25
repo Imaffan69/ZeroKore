@@ -1,6 +1,7 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { requireUser, errorResponse, readJson, readString } from "@/lib/api-auth";
 import { getOwnedProject } from "@/lib/projects";
+import { projectNameError } from "@/lib/slug"
 import type { ProjectEnvironment } from "@/types/projects";
 
 export const dynamic = "force-dynamic";
@@ -68,7 +69,15 @@ export async function PATCH(
     };
 
     const name = readString(body, "name", 80);
-    if (name) patch.name = name;
+    if (name) {
+      // Renaming re-derives a public slug, so it is moderated too â€” otherwise
+      // creating is blocked but renaming to the same name is not.
+      const nameProblem = projectNameError(name);
+      if (nameProblem) {
+        return NextResponse.json({ error: nameProblem }, { status: 400 });
+      }
+      patch.name = name;
+    }
     if (typeof body.description === "string") {
       patch.description = body.description.trim().slice(0, 400);
     }

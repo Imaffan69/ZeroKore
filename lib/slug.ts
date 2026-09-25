@@ -35,6 +35,68 @@ export function slugify(input: string): string {
   return base || "project";
 }
 
+/**
+ * Project name rules.
+ *
+ * A project's slug is public and printed in every URL (`/<username>/<project>`),
+ * so it needs the same protection a username gets. Without this, anyone could
+ * create `/porn` or squat `/admin` — names already reserved at the account
+ * level, which is exactly the impersonation the username rules prevent.
+ *
+ * The blocked-word and folding logic is shared with `lib/username.ts` rather
+ * than duplicated, so the two lists cannot drift apart.
+ */
+
+import { isReservedUsername, containsBlockedWord } from "@/lib/username";
+
+/** Platform paths a project must not shadow. */
+const PROJECT_RESERVED_PREFIXES = [
+  "zerokore", "zero-kore", "zk-", "admin", "official", "support", "staff",
+  "api", "kore",
+] as const;
+
+/** Slugs reserved because a real page already lives there. */
+const PROJECT_RESERVED_EXACT = new Set([
+  "admin", "login", "logout", "signup", "register", "settings", "dashboard",
+  "account", "accounts", "billing", "pricing", "about", "blog", "news",
+  "privacy", "terms", "legal", "docs", "documentation", "status", "health",
+  "help", "support", "contact", "careers", "jobs", "team", "security",
+  "new", "create", "import", "export", "search", "explore", "home", "index",
+]);
+
+export function isReservedProjectSlug(slug: string): boolean {
+  const s = slug.toLowerCase();
+  if (PROJECT_RESERVED_EXACT.has(s)) return true;
+  if (PROJECT_RESERVED_PREFIXES.some((p) => s.startsWith(p))) return true;
+  // Inherits the full platform-reserved set (system, root, owner, …).
+  return isReservedUsername(s);
+}
+
+/**
+ * Why a project name is unacceptable, or `null` when it is fine.
+ * Returns user-facing text so the create form and the API agree.
+ */
+export function projectNameError(input: string): string | null {
+  const name = input.trim();
+  if (!name) return "Give the project a name.";
+  if (name.length > 80) return "Project names can be at most 80 characters.";
+
+  // Check the derived slug, not just the typed name: "P0rn!" and "porn" are the
+  // same URL, and padding or leet spelling must not slip past.
+  const slug = slugify(name);
+  if (isReservedProjectSlug(slug)) {
+    return "That project name is reserved. Try another.";
+  }
+  if (containsBlockedWord(name) || containsBlockedWord(slug)) {
+    return "Pick a different project name — that one is not allowed.";
+  }
+  return null;
+}
+
+export function isValidProjectName(input: string): boolean {
+  return projectNameError(input) === null;
+}
+
 /** Format a timestamp as a short relative time. */
 export function formatWhen(iso: string): string {
   const then = new Date(iso).getTime();

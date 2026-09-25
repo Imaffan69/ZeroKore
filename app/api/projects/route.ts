@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import {
   requireUser,
   errorResponse,
@@ -7,6 +7,7 @@ import {
   BadRequestError,
 } from "@/lib/api-auth";
 import { uniqueSlug, DEFAULT_ENVIRONMENTS } from "@/lib/projects";
+import { projectNameError } from "@/lib/slug";
 import type { Project } from "@/types/projects";
 
 export const dynamic = "force-dynamic";
@@ -48,6 +49,11 @@ export async function POST(req: Request) {
 
     const name = readString(body, "name", 80);
     if (!name) throw new BadRequestError("Give the project a name.");
+
+    // A project slug is public (`/<username>/<project>`), so it is moderated
+    // exactly like a username: no reserved platform paths, no blocked words.
+    const nameProblem = projectNameError(name);
+    if (nameProblem) throw new BadRequestError(nameProblem);
 
     const slug = await uniqueSlug(supabase, user.id, name);
     const { data: created, error } = await supabase

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import {
   requireUser,
   errorResponse,
@@ -20,6 +20,7 @@ import {
   fetchFileContent,
 } from "@/lib/github";
 import { buildPreviewDocument, pickPreviewEntry } from "@/lib/preview";
+import { projectNameError } from "@/lib/slug";
 import type { Project } from "@/types/projects";
 
 export const dynamic = "force-dynamic";
@@ -56,7 +57,7 @@ async function fetchInBatches(
  * Import a GitHub repository as a project.
  *
  * Body: { repo: "owner/name", branch?, name?, paths? }
- * Ownership of the repo is established by the user's own OAuth token — GitHub
+ * Ownership of the repo is established by the user's own OAuth token â€” GitHub
  * itself decides what that token can read, so a private repo is only importable
  * by someone who already has access to it.
  */
@@ -75,7 +76,7 @@ export async function POST(req: Request) {
       return NextResponse.json(
         {
           error:
-            "Connect your GitHub account before importing. Settings → Integrations.",
+            "Connect your GitHub account before importing. Settings â†’ Integrations.",
         },
         { status: 400 }
       );
@@ -124,6 +125,12 @@ export async function POST(req: Request) {
     }
 
     const name = readString(body, "name", 80) || repo.split("/")[1];
+    // An imported repo's name becomes a public slug, so it is moderated exactly
+    // like a typed project name. A repo called "admin" must not become /admin.
+    const nameProblem = projectNameError(name);
+    if (nameProblem) {
+      return NextResponse.json({ error: nameProblem }, { status: 400 });
+    }
     const slug = await uniqueSlug(supabase, user.id, name);
 
     const { data: created, error: createError } = await supabase
