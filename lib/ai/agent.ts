@@ -378,14 +378,27 @@ export async function runAgent(input: AgentRunInput): Promise<AgentRunResult> {
   console.log(JSON.stringify({ event: "agent_completed", provider }));
 
   // --- Persist messages (ownership via conversation check) ---
+  //
+  // The insert used to be fire-and-forget: if it failed, the reply was still
+  // returned and the chat silently forgot itself, with no error anywhere. That
+  // is exactly what happened when `messages` did not exist on a
+  // migrations-only database, so the result is now checked and reported.
   const { data: owns } = await supabase
     .from("conversations")
     .select("id")
     .eq("id", conversationId)
     .eq("user_id", userId)
     .maybeSingle();
-  if (owns) {
-    await supabase.from("messages").insert([
+
+  if (!owns) {
+    console.log(
+      JSON.stringify({
+        event: "chat_persist_skipped",
+        reason: "conversation_not_owned",
+      })
+    );
+  } else {
+    const { error: saveError } = await supabase.from("messages").insert([
       { conversation_id: conversationId, role: "user", content: message },
       {
         conversation_id: conversationId,
@@ -394,6 +407,25 @@ export async function runAgent(input: AgentRunInput): Promise<AgentRunResult> {
         tool_calls: allToolCalls.length > 0 ? allToolCalls : null,
       },
     ]);
+
+    if (saveError) {
+      // Surface it. A lost message is a real fault and must be visible in the
+      // server log rather than inferred weeks later from missing history.
+      console.log(
+        JSON.stringify({
+          event: "chat_persist_failed",
+          conversationId,
+          error: saveError.message,
+          code: saveError.code ?? null,
+        })
+      );
+      events.push(
+        event(
+          "persist_failed",
+          "[Not Saved] This reply was not saved to your history."
+        )
+      );
+    }
   }
 
   return {

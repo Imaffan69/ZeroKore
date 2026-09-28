@@ -52,6 +52,23 @@ async function githubStorageState(): Promise<string> {
   }
 }
 
+/** Whether the chat tables exist, so history can actually be written. */
+async function chatStorageState(): Promise<string> {
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return "no service role key";
+  try {
+    const { createServiceClient } = await import("@/lib/supabase/server");
+    const service = await createServiceClient();
+    // A count proves both tables exist; no message content is read.
+    const { error } = await service
+      .from("messages")
+      .select("id", { count: "exact", head: true });
+    if (error) return `table unavailable (${error.message})`;
+    return "ready";
+  } catch (err) {
+    return `unreachable (${err instanceof Error ? err.message : "unknown"})`;
+  }
+}
+
 export async function GET(req: NextRequest) {
   const models = await providerCatalog();
   const github =
@@ -104,6 +121,11 @@ export async function GET(req: NextRequest) {
     // schema.sql, so every write failed and every read looked like
     // "not connected". Reporting it turns a silent failure into a visible one.
     githubStorage: await githubStorageState(),
+    // Chat history lives in `messages`, which like github_connections was
+    // defined only in the outdated schema.sql. Without migration 008 the agent
+    // replies normally and silently discards every message, so this is worth
+    // reporting rather than leaving as another invisible failure.
+    chatStorage: await chatStorageState(),
     // Without a valid ENCRYPTION_KEY the Secrets environment refuses to store
     // values (AES-256-GCM) rather than writing them in plaintext.
     encryption: isEncryptionConfigured() ? "configured" : "not configured",

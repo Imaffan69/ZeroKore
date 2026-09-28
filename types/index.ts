@@ -26,6 +26,9 @@ export type AgentEventKind =
   | "provider_fallback"
   | "generating_artifact"
   | "completed"
+  // The reply was produced but not written to history — shown to the user so a
+  // lost message is visible in the transcript instead of silently missing later.
+  | "persist_failed"
   | "error";
 
 export interface AgentEvent {

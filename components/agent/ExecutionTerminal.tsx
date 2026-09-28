@@ -73,6 +73,9 @@ const EVENT_STYLE: Record<AgentEvent["kind"], string> = {
   provider_fallback: "text-kore-warn",
   generating_artifact: "text-white",
   completed: "text-kore-accent",
+  // A reply that was produced but not stored is a warning, not a hard error:
+  // the work is on screen, it just will not be in history.
+  persist_failed: "text-amber-300",
   error: "text-kore-danger",
 };
 

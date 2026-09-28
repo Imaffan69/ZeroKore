@@ -56,6 +56,9 @@ const TONE_BY_EVENT: Record<AgentEvent["kind"], TranscriptLine["tone"]> = {
   provider_fallback: "warn",
   generating_artifact: "tool",
   completed: "info",
+  // Not a hard failure — the reply rendered, it just was not written to
+  // history. Warn so the user is not surprised by a message missing later.
+  persist_failed: "warn",
   error: "error",
 };
 
