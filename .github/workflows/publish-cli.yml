@@ -1,0 +1,65 @@
+name: Publish CLI to npm
+
+# Trusted publishing (OIDC) — no long-lived npm token, and no 2FA token to
+# rotate or leak. npm exchanges this workflow's short-lived identity for a
+# publish credential scoped to the `zerokore` package.
+#
+# This is the path npm requires before January 2027, when bypass-2FA tokens
+# lose direct publish entirely.
+#
+# One-time setup (must match exactly, or the OIDC handshake is rejected):
+#   npmjs.com → Settings → Trusted Publishers → Add GitHub Actions
+#     organization/user : Imaffan69
+#     repository         : ZeroKore
+#     workflow filename  : publish-cli.yml
+#     environment        : (leave blank unless you create one)
+#
+# Publishing is manual-only. A tag push must never publish, because a tag can
+# be created by anyone with write access and would silently ship whatever the
+# CLI contained at that moment.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: "Pack and verify without publishing"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  # OIDC: the only permission npm needs to mint a publish token.
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cli
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          # The CLI has no dependencies, so this exists only to give the
+          # publish step a place to read the package name and version from.
+          registry-url: https://registry.npmjs.org
+
+      - name: Sanity check
+        run: |
+          node --check zerokore.js
+          node -e "const p=require('./package.json'); \
+            if (p.name !== 'zerokore') throw new Error('unexpected name: ' + p.name); \
+            if (!p.bin || !p.bin.zerokore) throw new Error('bin.zerokore missing'); \
+            if (Object.keys(p.dependencies || {}).length) throw new Error('CLI must stay dependency-free'); \
+            console.log('publishing ' + p.name + '@' + p.version);"
+
+      - name: Pack (dry run)
+        run: npm pack --dry-run
+
+      - name: Publish
+        if: ${{ !inputs.dry-run }}
+        run: npm publish --access public --provenance
