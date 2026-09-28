@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { providerCatalog } from "@/lib/ai/cascade-router";
 import { isEncryptionConfigured } from "@/lib/crypto";
 import { platformReady } from "@/lib/platform";
@@ -14,7 +14,45 @@ import { isAdminConfigured, listAdminAccounts } from "@/lib/admin-auth";
  * Staff counts are reported as counts only: the panel's entry point is
  * unlisted, and publishing staff addresses here would defeat that.
  */
-export async function GET() {
+/**
+ * The origin GitHub will redirect back to.
+ *
+ * Behind a proxy (Vercel) `req.nextUrl.origin` can be the internal host, so
+ * prefer the public URL and fall back to the request origin.
+ */
+function publicOrigin(req: NextRequest): string {
+  return (
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "") ||
+    req.nextUrl.origin
+  );
+}
+
+/**
+ * Whether `github_connections` is actually present.
+ *
+ * Read with the service role because the table deliberately has no client
+ * policies — a browser session must never be able to read a token. A failure
+ * here is the signal that migration 007 has not been applied.
+ */
+async function githubStorageState(): Promise<string> {
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return "no service role key";
+  try {
+    const { createServiceClient } = await import("@/lib/supabase/server");
+    const service = await createServiceClient();
+    // A count is enough: any successful query proves the table exists, and no
+    // token value is read or exposed.
+    const { error } = await service
+      .from("github_connections")
+      .select("user_id", { count: "exact", head: true });
+    if (error) return `table unavailable (${error.message})`;
+    return "ready";
+  } catch (err) {
+    return `unreachable (${err instanceof Error ? err.message : "unknown"})`;
+  }
+}
+
+export async function GET(req: NextRequest) {
   const models = await providerCatalog();
   const github =
     !!process.env.GITHUB_CLIENT_ID && !!process.env.GITHUB_CLIENT_SECRET;
@@ -54,6 +92,18 @@ export async function GET() {
       : "not configured",
     search: process.env.TAVILY_API_KEY ? "configured" : "not configured",
     github: github ? "configured" : "not configured",
+    // The exact callback this deployment sends to GitHub. Publishing it is
+    // harmless — it is already visible in the authorize URL — and it is the
+    // single most useful thing to check when the OAuth screen misbehaves,
+    // because GitHub rejects any redirect_uri that is not registered exactly.
+    githubCallback: github
+      ? `${publicOrigin(req)}/api/github/oauth`
+      : null,
+    // Whether the token table actually exists. This was the real cause of
+    // "import does nothing": github_connections lived only in the outdated
+    // schema.sql, so every write failed and every read looked like
+    // "not connected". Reporting it turns a silent failure into a visible one.
+    githubStorage: await githubStorageState(),
     // Without a valid ENCRYPTION_KEY the Secrets environment refuses to store
     // values (AES-256-GCM) rather than writing them in plaintext.
     encryption: isEncryptionConfigured() ? "configured" : "not configured",

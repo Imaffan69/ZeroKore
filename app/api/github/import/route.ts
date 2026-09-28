@@ -1,4 +1,4 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import {
   requireUser,
   errorResponse,
@@ -18,6 +18,7 @@ import {
   readGitHubToken,
   fetchRepoTree,
   fetchFileContent,
+  GitHubStorageError,
 } from "@/lib/github";
 import { buildPreviewDocument, pickPreviewEntry } from "@/lib/preview";
 import { projectNameError } from "@/lib/slug";
@@ -71,12 +72,24 @@ export async function POST(req: Request) {
       throw new BadRequestError("Choose a repository as owner/name.");
     }
 
-    const token = await readGitHubToken(user.id);
+    let token: string | null;
+    try {
+      token = await readGitHubToken(user.id);
+    } catch (err) {
+      // A storage fault must not masquerade as "not connected".
+      if (err instanceof GitHubStorageError) {
+        return NextResponse.json(
+          { error: err.message, hint: err.hint },
+          { status: 503 }
+        );
+      }
+      throw err;
+    }
     if (!token) {
       return NextResponse.json(
         {
           error:
-            "Connect your GitHub account before importing. Settings â†’ Integrations.",
+            "Connect your GitHub account before importing. Settings → Integrations.",
         },
         { status: 400 }
       );

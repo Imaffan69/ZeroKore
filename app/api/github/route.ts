@@ -5,6 +5,7 @@ import {
   deleteGitHubToken,
   isGitHubOAuthConfigured,
   isGitHubStorageConfigured,
+  GitHubStorageError,
 } from "@/lib/github";
 
 export const dynamic = "force-dynamic";
@@ -41,6 +42,23 @@ export async function GET() {
           : undefined,
     });
   } catch (err) {
+    // Distinguish "you are not connected" from "the server cannot read your
+    // connection". Reporting a broken table as "not connected" is what made
+    // this failure invisible.
+    if (err instanceof GitHubStorageError) {
+      return NextResponse.json(
+        {
+          configured: isGitHubOAuthConfigured(),
+          storage: isGitHubStorageConfigured(),
+          connected: false,
+          user: null,
+          fault: true,
+          message: err.message,
+          hint: err.hint,
+        },
+        { status: 503 }
+      );
+    }
     return errorResponse(err);
   }
 }

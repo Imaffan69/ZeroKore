@@ -1,5 +1,5 @@
-﻿/**
- * ZeroKore Desktop â€” main process.
+/**
+ * ZeroKore Desktop Ã¢â‚¬â€ main process.
  *
  * A real native shell around the ZeroKore workspace. It is not a mock: the
  * window loads the actual product, keeps your session, and hands OAuth,
@@ -7,7 +7,7 @@
  *
  * Security posture (this is the part that matters for a shell that loads a web
  * app):
- *  - contextIsolation on, nodeIntegration off â€” the renderer never gets Node.
+ *  - contextIsolation on, nodeIntegration off Ã¢â‚¬â€ the renderer never gets Node.
  *  - A preload exposes a deliberately tiny, validated API surface.
  *  - Popups are denied; their URL is opened in the user's browser instead.
  *  - Navigation is restricted to our own origin, so a malicious link cannot
@@ -49,7 +49,7 @@ const ALLOWED_ORIGINS = new Set(
   )
 );
 
-/** window-state.json â€” remembers size/position between launches. */
+/** window-state.json Ã¢â‚¬â€ remembers size/position between launches. */
 const stateFile = () => path.join(app.getPath("userData"), "window-state.json");
 
 function readState() {
@@ -60,7 +60,7 @@ function readState() {
       return parsed;
     }
   } catch {
-    // first run, or a corrupted file â€” defaults below
+    // first run, or a corrupted file Ã¢â‚¬â€ defaults below
   }
   return { width: 1440, height: 940, maximized: false };
 }
@@ -111,7 +111,7 @@ function createWindow() {
 
   if (state.maximized) mainWindow.maximize();
 
-  // Show only once the first paint lands â€” no white flash on launch.
+  // Show only once the first paint lands Ã¢â‚¬â€ no white flash on launch.
   mainWindow.once("ready-to-show", () => {
     mainWindow.show();
     if (pendingDeepLink) {
@@ -172,6 +172,15 @@ function handleDeepLink(raw) {
     pendingDeepLink = raw;
     return;
   }
+
+  // `zerokore://auth?token=â€¦` is a sign-in result, not a page to navigate to:
+  // hand it to the waiting sign-in and leave the IDE on screen.
+  if (deliverAuthToken(raw)) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.focus();
+    return;
+  }
+
   let target = START_URL;
   try {
     const url = new URL(raw);
@@ -199,6 +208,76 @@ function setSingleInstance() {
     if (link) handleDeepLink(link);
   });
   return true;
+}
+
+/**
+ * Sign in through the user's real browser, then come back to the app.
+ *
+ * Google and GitHub both refuse to authenticate inside an embedded webview, so
+ * a desktop app has to hand the flow to the default browser and receive the
+ * result back. The server issues a short-lived, single-use token and hands the
+ * result to us over `zerokore://auth?token=...` â€” the protocol the OS already
+ * routes here. The user's password never touches the app.
+ */
+let pendingAuth = null;
+
+function registerBrowserAuth() {
+  ipcMain.handle("ide:auth-begin", async () => {
+    try {
+      const res = await fetch(APP_ORIGIN + "/api/auth/device", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!body || !body.url || !body.code) {
+        return { error: "Could not start sign-in. Try again." };
+      }
+      await shell.openExternal(body.url);
+
+      // Arm the waiter AFTER opening the browser but before returning, so the
+      // deep link cannot arrive before anything is waiting for it. Awaiting
+      // before `openExternal` would deadlock — the browser that delivers the
+      // link is never opened until the promise settles.
+      const grant = await new Promise((resolve, reject) => {
+        pendingAuth = { resolve, reject };
+        setTimeout(() => {
+          if (pendingAuth && pendingAuth.reject === reject) {
+            pendingAuth = null;
+            reject(new Error("Sign-in timed out. Try again."));
+          }
+        }, 10 * 60 * 1000);
+      });
+      return { grant: grant };
+    } catch (err) {
+      return { error: err.message };
+    } finally {
+      pendingAuth = null;
+    }
+  });
+
+  ipcMain.handle("ide:auth-cancel", () => {
+    if (pendingAuth) pendingAuth.reject(new Error("Sign-in cancelled."));
+    pendingAuth = null;
+    return true;
+  });
+}
+
+/** Called when a `zerokore://auth?token=...` link arrives. */
+function deliverAuthToken(raw) {
+  try {
+    const url = new URL(raw);
+    // `zerokore://auth?token=â€¦` parses as hostname "auth" with an empty path.
+    const route = ((url.hostname || "") + (url.pathname || "")).replace(/\/+/g, "/");
+    if (route !== "/auth") return false;
+    const grant = url.searchParams.get("grant");
+    if (!grant || !pendingAuth) return false;
+    const waiter = pendingAuth;
+    pendingAuth = null;
+    waiter.resolve(grant);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** Custom protocol so the OS can hand us links back. */
@@ -357,7 +436,7 @@ function buildMenu() {
 }
 
 // ---------------------------------------------------------------------------
-// IPC â€” the entire renderer-facing surface. Keep it this small.
+// IPC Ã¢â‚¬â€ the entire renderer-facing surface. Keep it this small.
 // ---------------------------------------------------------------------------
 // ---------------------------------------------------------------------------
 // Real IDE back end.
@@ -586,7 +665,7 @@ function registerIpc() {
   ipcMain.handle("zk:version", () => app.getVersion());
   ipcMain.handle("zk:platform", () => process.platform);
   ipcMain.handle("zk:open-external", (_event, url) => {
-    // Only http(s) â€” never hand arbitrary schemes to the OS.
+    // Only http(s) Ã¢â‚¬â€ never hand arbitrary schemes to the OS.
     if (typeof url === "string" && /^https?:\/\//i.test(url)) {
       shell.openExternal(url);
       return true;
@@ -622,6 +701,7 @@ if (!setSingleInstance()) {
     hardenSession(session.defaultSession);
     registerIpc();
     registerIdeIpc();
+    registerBrowserAuth();
     buildMenu();
     createWindow();
 

@@ -145,6 +145,16 @@ export interface GitHubStatus {
   connected: boolean;
   configured: boolean;
   user?: string | null;
+  /**
+   * True when the server could not read the connection for a reason other
+   * than "not connected" (missing table, bad service key, rotated
+   * ENCRYPTION_KEY). This is distinct from `connected: false` and must be
+   * reported as a fault, not as an invitation to reconnect.
+   */
+  fault?: boolean;
+  message?: string;
+  /** Actionable next step shown alongside `message`. */
+  hint?: string;
 }
 
 /** Summary of a skill committed at `.claude/skills/<name>/SKILL.md`. */

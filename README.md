@@ -206,7 +206,10 @@ Stop cancels the frontend request; the backend always caps iterations.
   `project_secrets` has RLS with no client policy, so values are never readable
   from the browser.
 - GitHub tokens live in `github_connections` (no client policies) and are read
-  only inside route handlers after ownership checks.
+  only inside route handlers after ownership checks. They are encrypted at
+  rest with AES-256-GCM via `ENCRYPTION_KEY` — the same helper used for project
+  secrets — because the token carries `repo` scope over private repositories.
+  Storage faults are reported as faults, never as "not connected".
 
 ## Troubleshooting
 
@@ -222,6 +225,8 @@ Stop cancels the frontend request; the backend always caps iterations.
 | Memory empty / no recall | Normal until the agent stores facts; check `agent_memory` rows |
 | 429 on first request | Clock/date skew or stale row — check `user_usage` |
 | Import says "GitHub is not configured on the server" | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` are unset. Create the OAuth app, set the callback URL to `https://<domain>/api/github/oauth`, add both variables, then redeploy. `/api/health` should report `github: configured`. |
+| Import says the server cannot read the GitHub connection | The token table is missing or unreadable. Apply ``supabase/migrations/007_github_connections.sql``. ``/api/health`` reports ``githubStorage``. |
+| GitHub shows an error instead of the app | The callback URL does not match your OAuth app exactly. Copy the value under Settings -> Integrations (also returned as ``githubCallback``). Local dev sends a ``localhost`` callback and needs its own OAuth app. |
 | Secrets environment says "Set ENCRYPTION_KEY" | Generate a 32-byte key (`node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`), add it as `ENCRYPTION_KEY`, redeploy. `/api/health` should report `encryption: configured`. |
 | Live config unknown | `curl -sS https://<domain>/api/health` — reports models, database, auth, search, GitHub, and encryption state without exposing any value. |
 | Build errors about Supabase env | Build is static-safe; runtime throws clear errors when keys are missing |

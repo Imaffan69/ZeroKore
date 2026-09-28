@@ -1,5 +1,5 @@
 /**
- * ZeroKore Desktop — preload bridge.
+ * ZeroKore Desktop Ã¢â‚¬â€ preload bridge.
  *
  * Runs in an isolated world with `sandbox: true`. The renderer only ever sees
  * the four functions below; there is no `require`, no `process`, and no Node
@@ -19,7 +19,11 @@ contextBridge.exposeInMainWorld("zerokore", {
   /** Desktop app version. */
   version: () => ipcRenderer.invoke("zk:version"),
 
-  /** 'win32' | 'darwin' | 'linux' — lets the UI adapt shortcuts. */
+  // Sign in through the real browser; resolves with a session or an error.
+  "ide:auth-begin": () => ipcRenderer.invoke("ide:auth-begin"),
+  "ide:auth-cancel": () => ipcRenderer.invoke("ide:auth-cancel"),
+
+  /** 'win32' | 'darwin' | 'linux' Ã¢â‚¬â€ lets the UI adapt shortcuts. */
   platform: () => ipcRenderer.invoke("zk:platform"),
 
   /**
@@ -38,7 +42,7 @@ contextBridge.exposeInMainWorld("zerokore", {
  * Separate from `zerokore` because it is a different trust surface: these calls
  * touch the real filesystem and spawn a real shell. Every path is re-validated
  * in the main process against the folder the user explicitly opened, so the
- * renderer cannot escape it — the bridge exposes no path primitive of its own.
+ * renderer cannot escape it Ã¢â‚¬â€ the bridge exposes no path primitive of its own.
  */
 contextBridge.exposeInMainWorld("ide", {
   /** Native folder picker. Resolves to the chosen path, or null if cancelled. */

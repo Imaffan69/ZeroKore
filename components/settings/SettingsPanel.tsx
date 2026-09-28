@@ -42,6 +42,10 @@ interface HealthData {
   models: ProviderInfo[];
   search: string;
   github: string;
+  /** The exact callback this deployment sends to GitHub, or null. */
+  githubCallback?: string | null;
+  /** "ready" when the token table exists; otherwise a description of why not. */
+  githubStorage?: string;
   encryption: string;
   serviceRole: string;
   staff: string;
@@ -230,15 +234,26 @@ export default function SettingsPanel({
   const [ghBusy, setGhBusy] = useState(false);
 
   const loadGithub = useCallback(async () => {
+    // Read the body even on a non-2xx: the server reports a storage fault as
+    // 503 with `fault: true`, and treating that as "not connected" is exactly
+    // what made a broken table look like an invitation to reconnect.
+    const unreadable: GitHubStatus = {
+      configured: false,
+      connected: false,
+      fault: true,
+      message: "Could not reach the server to check your GitHub connection.",
+      hint: "Reload once the site is reachable.",
+    };
     try {
-      const res = await fetch("/api/github");
-      if (res.ok) {
-        setGithub(await res.json());
+      const res = await fetch("/api/github", { cache: "no-store" });
+      const body = (await res.json().catch(() => null)) as GitHubStatus | null;
+      if (body && typeof body.configured === "boolean") {
+        setGithub(body);
       } else {
-        setGithub({ configured: false, connected: false });
+        setGithub(unreadable);
       }
     } catch {
-      setGithub({ configured: false, connected: false });
+      setGithub(unreadable);
     }
   }, []);
 
@@ -262,8 +277,11 @@ export default function SettingsPanel({
       return;
     }
     // Full-page redirect to GitHub's consent screen, which returns to
-    // /api/github/oauth?code=... and then back to /dashboard.
-    window.location.href = "/api/github/oauth";
+    // /api/github/oauth?code=... and then back here. `next` keeps the user on
+    // the page they started from rather than dumping them on the dashboard.
+    window.location.href = `/api/github/oauth?next=${encodeURIComponent(
+      window.location.pathname + window.location.search
+    )}`;
   }
 
   async function disconnectGithub() {
@@ -576,16 +594,58 @@ export default function SettingsPanel({
                       <ExternalLink className="h-3 w-3" aria-hidden />
                     </a>
                   </div>
-                  {!github.configured && (
+                  {!github.configured ? (
                     <div className="flex items-start gap-2 rounded-xl border border-kore-warn/40 bg-kore-warn/10 px-3 py-2.5 text-xs text-amber-200">
                       <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
                       <span>
                         Not configured yet: add <span className="font-mono">GITHUB_CLIENT_ID</span>{" "}
                         and <span className="font-mono">GITHUB_CLIENT_SECRET</span> to the
-                        server environment (Vercel → Settings → Environment Variables),
-                        with the OAuth callback URL set to{" "}
-                        <span className="font-mono">{"{your-domain}"}/api/github/oauth</span>.
+                        server environment (Vercel → Settings → Environment Variables).
                       </span>
+                    </div>
+                  ) : github.fault ? (
+                    <div className="flex items-start gap-2 rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2.5 text-xs text-red-200">
+                      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+                      <span>
+                        <strong className="text-red-100">
+                          GitHub is connected but the server cannot read it.
+                        </strong>{" "}
+                        {github.message} {github.hint}
+                      </span>
+                    </div>
+                  ) : health && health.githubStorage !== "ready" ? (
+                    <div className="flex items-start gap-2 rounded-xl border border-kore-warn/40 bg-kore-warn/10 px-3 py-2.5 text-xs text-amber-200">
+                      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+                      <span>
+                        <strong className="text-amber-100">
+                          The database is not ready for GitHub.
+                        </strong>{" "}
+                        Token storage reports{" "}
+                        <span className="font-mono">{health.githubStorage}</span>. Apply{" "}
+                        <span className="font-mono">
+                          supabase/migrations/007_github_connections.sql
+                        </span>{" "}
+                        or connections cannot be saved.
+                      </span>
+                    </div>
+                  ) : null}
+
+                  {/* The single most useful value when GitHub rejects a
+                      connection: the exact callback this deployment sends. */}
+                  {health?.githubCallback && (
+                    <div className="rounded-xl border border-white/10 bg-black/40 px-3 py-2.5 text-xs text-kore-muted">
+                      <p className="font-mono text-[10px] tracking-[0.14em] text-kore-faint">
+                        CALLBACK URL TO REGISTER ON GITHUB
+                      </p>
+                      <p className="mt-1 break-all font-mono text-kore-text">
+                        {health.githubCallback}
+                      </p>
+                      <p className="mt-1.5">
+                        Must match your OAuth app exactly or GitHub shows an
+                        error instead of connecting. Local development sends a{" "}
+                        <span className="font-mono">localhost</span> callback, which
+                        needs a second OAuth app.
+                      </p>
                     </div>
                   )}
                 </div>

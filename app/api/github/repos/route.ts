@@ -5,6 +5,7 @@ import {
   fetchGitHubRepos,
   isGitHubOAuthConfigured,
   isGitHubStorageConfigured,
+  GitHubStorageError,
 } from "@/lib/github";
 
 export const dynamic = "force-dynamic";
@@ -56,6 +57,14 @@ export async function GET() {
       );
     }
   } catch (err) {
+    // A storage fault is not the same as "not connected" and must not look
+    // like it: that is exactly what hid a missing table for so long.
+    if (err instanceof GitHubStorageError) {
+      return NextResponse.json(
+        { repos: [], message: err.message, hint: err.hint, fault: true },
+        { status: 503 }
+      );
+    }
     return errorResponse(err);
   }
 }

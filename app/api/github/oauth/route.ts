@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { writeGitHubToken } from "@/lib/github";
+import { writeGitHubToken, GitHubStorageError } from "@/lib/github";
 
 /**
  * GitHub OAuth: start + callback in one route.
@@ -16,14 +16,31 @@ import { writeGitHubToken } from "@/lib/github";
 
 const SCOPE = "repo read:user";
 
+/**
+ * The callback GitHub will redirect back to.
+ *
+ * GitHub compares this string against the registered callback exactly, so it
+ * must be the public origin. Behind a proxy `req.url` can be the internal
+ * host, which would produce a redirect_uri that is registered nowhere and a
+ * bare error screen. Prefer an explicit public URL, then Vercel's own env
+ * value, and only fall back to the request.
+ */
+function publicOrigin(req: NextRequest): string {
+  return (
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "") ||
+    new URL(req.url).origin
+  );
+}
+
 function redirectUri(req: NextRequest): string {
-  const url = new URL(req.url);
-  return `${url.origin}/api/github/oauth`;
+  return `${publicOrigin(req)}/api/github/oauth`;
 }
 
 function backWithError(req: NextRequest, message: string): NextResponse {
+  const origin = publicOrigin(req);
   const url = new URL(req.url);
-  const target = new URL(safeReturn(url.searchParams.get("next")), url.origin);
+  const target = new URL(safeReturn(url.searchParams.get("next")), origin);
   target.searchParams.set("github_error", message);
   return NextResponse.redirect(target);
 }
@@ -156,10 +173,16 @@ export async function GET(req: NextRequest) {
     }
     try {
       await writeGitHubToken(user.id, ghLogin, accessToken);
-    } catch {
+    } catch (err) {
+      // Name the actual cause. "Could not store the token" with no further
+      // detail sent people looking at their GitHub settings when the fault was
+      // a missing migration on our side.
+      const detail = err instanceof Error ? ` (${err.message})` : "";
+      const hint =
+        err instanceof GitHubStorageError ? ` ${err.hint}` : "";
       return backWithError(
         req,
-        "GitHub authorised, but ZeroKore could not store the token. Check SUPABASE_SERVICE_ROLE_KEY on the server."
+        `GitHub authorised, but ZeroKore could not store the token${detail}.${hint}`.trim()
       );
     }
 
@@ -184,7 +207,7 @@ export async function GET(req: NextRequest) {
       );
     }
     const safeNext = state?.n ?? safeReturn(url.searchParams.get("next"));
-    const target = new URL(safeNext, url.origin);
+    const target = new URL(safeNext, publicOrigin(req));
     target.searchParams.set("github", "connected");
     target.searchParams.set("github_login", ghLogin);
     return NextResponse.redirect(target.toString());

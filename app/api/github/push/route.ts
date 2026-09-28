@@ -7,7 +7,7 @@ import {
   BadRequestError,
 } from "@/lib/api-auth";
 import { getOwnedProject } from "@/lib/projects";
-import { readGitHubToken, pushFileToGitHub } from "@/lib/github";
+import { readGitHubToken, pushFileToGitHub, GitHubStorageError } from "@/lib/github";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -49,7 +49,19 @@ export async function POST(req: Request) {
       );
     }
 
-    const token = await readGitHubToken(user.id);
+    let token: string | null;
+    try {
+      token = await readGitHubToken(user.id);
+    } catch (err) {
+      // A storage fault must not masquerade as "not connected".
+      if (err instanceof GitHubStorageError) {
+        return NextResponse.json(
+          { error: err.message, hint: err.hint },
+          { status: 503 }
+        );
+      }
+      throw err;
+    }
     if (!token) {
       return NextResponse.json(
         {

@@ -1,5 +1,6 @@
 import type { GitHubRepo } from "@/types/projects";
 import { createServiceClient } from "@/lib/supabase/server";
+import { encryptSecret, decryptSecret } from "@/lib/crypto";
 
 /**
  * GitHub integration, server-side only.
@@ -27,35 +28,96 @@ export function isGitHubStorageConfigured(): boolean {
   return !!process.env.SUPABASE_SERVICE_ROLE_KEY;
 }
 
-/** The stored OAuth token for a user, or null when not connected. */
-export async function readGitHubToken(userId: string): Promise<string | null> {
-  if (!isGitHubStorageConfigured()) return null;
-  try {
-    const service = await createServiceClient();
-    const { data } = await service
-      .from(TABLE)
-      .select("access_token")
-      .eq("user_id", userId)
-      .maybeSingle();
-    return (data?.access_token as string) ?? null;
-  } catch {
-    return null;
+/**
+ * Raised when a stored connection cannot be read for a reason other than
+ * "the user never connected".
+ *
+ * Previously every read failure collapsed into a `null` that looked identical
+ * to "not connected", so a missing table or a bad service key produced an
+ * empty repo list and no explanation anywhere. Callers now surface this.
+ */
+export class GitHubStorageError extends Error {
+  constructor(
+    message: string,
+    readonly hint: string
+  ) {
+    super(message);
+    this.name = "GitHubStorageError";
   }
 }
 
-export async function readGitHubLogin(userId: string): Promise<string | null> {
-  if (!isGitHubStorageConfigured()) return null;
-  try {
-    const service = await createServiceClient();
-    const { data } = await service
-      .from(TABLE)
-      .select("github_login")
-      .eq("user_id", userId)
-      .maybeSingle();
-    return (data?.github_login as string) ?? null;
-  } catch {
-    return null;
+/**
+ * Tokens are stored encrypted with the same AES-256-GCM helper used for
+ * project secrets, because a GitHub OAuth token grants `repo` scope — full
+ * read/write on the user's private repositories. Plaintext in the database
+ * would mean any service-role read dumps that access.
+ *
+ * Rows written before encryption existed hold a raw token, so a value without
+ * the `iv.tag.ciphertext` shape is read as legacy plaintext and upgraded on
+ * the next successful connect.
+ */
+function decodeToken(raw: string): string {
+  const parts = raw.split(".");
+  if (parts.length === 3 && parts.every((p) => p.length > 0)) {
+    try {
+      return decryptSecret(raw);
+    } catch {
+      // A shape that looks encrypted but is not (wrong key, corrupted row)
+      // is a real fault — never fall back to treating it as plaintext.
+      throw new GitHubStorageError(
+        "Your stored GitHub connection could not be decrypted.",
+        "ENCRYPTION_KEY changed since this token was saved. Reconnect GitHub to store a fresh one."
+      );
+    }
   }
+  return raw;
+}
+
+/** The stored OAuth token for a user, or null when not connected. */
+export async function readGitHubToken(userId: string): Promise<string | null> {
+  if (!isGitHubStorageConfigured()) {
+    throw new GitHubStorageError(
+      "GitHub token storage is not configured.",
+      "Set SUPABASE_SERVICE_ROLE_KEY on the server."
+    );
+  }
+  const service = await createServiceClient();
+  const { data, error } = await service
+    .from(TABLE)
+    .select("access_token")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) {
+    throw new GitHubStorageError(
+      `Could not read the stored GitHub connection: ${error.message}`,
+      "If this table is missing, run supabase/migrations/007_github_connections.sql."
+    );
+  }
+  const raw = (data?.access_token as string) ?? null;
+  return raw ? decodeToken(raw) : null;
+}
+
+export async function readGitHubLogin(userId: string): Promise<string | null> {
+  if (!isGitHubStorageConfigured()) {
+    throw new GitHubStorageError(
+      "GitHub token storage is not configured.",
+      "Set SUPABASE_SERVICE_ROLE_KEY on the server."
+    );
+  }
+  const service = await createServiceClient();
+  const { data, error } = await service
+    .from(TABLE)
+    .select("github_login")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) {
+    throw new GitHubStorageError(
+      `Could not read the stored GitHub connection: ${error.message}`,
+      "If this table is missing, run supabase/migrations/007_github_connections.sql."
+    );
+  }
+  return (data?.github_login as string) ?? null;
 }
 
 export async function writeGitHubToken(
@@ -67,10 +129,15 @@ export async function writeGitHubToken(
   const { error } = await service.from(TABLE).upsert({
     user_id: userId,
     github_login: login,
-    access_token: token,
+    access_token: encryptSecret(token),
     updated_at: new Date().toISOString(),
   });
-  if (error) throw new Error(error.message);
+  if (error) {
+    throw new GitHubStorageError(
+      `Could not store the GitHub connection: ${error.message}`,
+      "If this table is missing, run supabase/migrations/007_github_connections.sql."
+    );
+  }
 }
 
 export async function deleteGitHubToken(userId: string): Promise<void> {
