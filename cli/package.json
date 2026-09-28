@@ -3,6 +3,11 @@
   "version": "1.0.0",
   "description": "ZeroKore CLI — drive your ZeroKore projects, files and agent from the terminal",
   "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Imaffan69/ZeroKore.git"
+  },
+  "homepage": "https://github.com/Imaffan69/ZeroKore#readme",
   "bin": {
     "zerokore": "zerokore.js"
   },
