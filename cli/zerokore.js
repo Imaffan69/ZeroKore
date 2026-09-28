@@ -6,12 +6,12 @@
  * ZeroKore CLI.
  *
  * A real client for the same account and projects the web app uses. Every
- * command performs a real HTTP call against the API — there is no local
+ * command performs a real HTTP call against the API ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â there is no local
  * simulation and no offline mode that pretends to have worked.
  *
  * Auth: `zerokore login` exchanges your email and password for a Supabase access
  * token and stores it in ~/.zerokore/config.json (mode 0600). That token is sent
- * as `Authorization: Bearer …`, which the API verifies server-side.
+ * as `Authorization: Bearer ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦`, which the API verifies server-side.
  */
 
 const fs = require("fs");
@@ -37,12 +37,15 @@ const C = {
 
 function loadConfig() {
   try {
-    return JSON.parse(fs.readFileSync(CONFIG_FILE, "utf8"));
+    // Strip a leading BOM: a config written by a Windows editor or by PowerShell
+    // starts with U+FEFF, which makes JSON.parse throw and would otherwise
+    // look exactly like "you are not signed in".
+    const raw = fs.readFileSync(CONFIG_FILE, "utf8").replace(/^\uFEFF/, "");
+    return JSON.parse(raw);
   } catch {
     return {};
   }
 }
-
 function saveConfig(cfg) {
   fs.mkdirSync(CONFIG_DIR, { recursive: true });
   // The token is a live credential: keep the file owner-only.
@@ -72,18 +75,62 @@ function ask(question) {
   );
 }
 
-/** Authenticated API call. Reads the token from the saved config. */
+/**
+ * Exchange the stored refresh token for a new access token.
+ *
+ * A Supabase access token lasts about an hour. Without this the CLI simply
+ * started failing with 401 some time after `login`, and the only remedy was to
+ * type the password again ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â not something a tool should demand. The refresh
+ * token is long-lived, so it is stored alongside and swapped silently; a
+ * failure here is not fatal, the next call just surfaces the 401.
+ */
+async function refreshSession() {
+  const cfg = loadConfig();
+  if (!cfg.refreshToken) return null;
+  try {
+    const pub = await publicSupabaseConfig();
+    if (!pub) return null;
+    const res = await fetch(pub.url + "/auth/v1/token?grant_type=refresh_token", {
+      method: "POST",
+      headers: { apikey: pub.anon, "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh_token: cfg.refreshToken }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!body.access_token) return null;
+    saveConfig({
+      ...cfg,
+      accessToken: body.access_token,
+      refreshToken: body.refresh_token || cfg.refreshToken,
+    });
+    return body.access_token;
+  } catch {
+    return null;
+  }
+}
+
+/** Authenticated API call, renewing the session once if the token expired. */
 async function api(pathname, options = {}) {
   const cfg = loadConfig();
   if (!cfg.accessToken) fail("Not signed in. Run: zerokore login");
-  const res = await fetch(`${BASE}${pathname}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${cfg.accessToken}`,
-      ...(options.headers || {}),
-    },
-  });
+
+  const send = (token) =>
+    fetch(`${BASE}${pathname}`, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+        ...(options.headers || {}),
+      },
+    });
+
+  let res = await send(cfg.accessToken);
+
+  // 401 means the access token expired or was revoked: renew once, then retry.
+  if (res.status === 401) {
+    const fresh = await refreshSession();
+    if (fresh) res = await send(fresh);
+  }
+
   const text = await res.text();
   let body = {};
   try {
@@ -91,12 +138,15 @@ async function api(pathname, options = {}) {
   } catch {
     body = { error: text.slice(0, 200) };
   }
-  if (!res.ok) fail(body.error || `${pathname} failed (${res.status})`);
+  if (!res.ok) {
+    if (res.status === 401) fail("Session expired. Run: zerokore login");
+    fail(body.error || `${pathname} failed (${res.status})`);
+  }
   return body;
 }
 
 /**
- * The public Supabase config is embedded in the site's client bundle — it is
+ * The public Supabase config is embedded in the site's client bundle ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â it is
  * public by design, and reading it here means the CLI needs no local setup.
  */
 async function publicSupabaseConfig() {
@@ -151,7 +201,14 @@ commands.login = async () => {
     fail(body.error_description || body.msg || "Sign-in failed.");
   }
 
-  saveConfig({ email: email, accessToken: body.access_token, base: BASE });
+  saveConfig({
+    email: email,
+    accessToken: body.access_token,
+    // Long-lived, so the CLI can renew itself instead of demanding the
+    // password again every time the short-lived access token expires.
+    refreshToken: body.refresh_token,
+    base: BASE,
+  });
   console.log(C.green + "signed in" + C.reset + " as " + email);
 };
 
