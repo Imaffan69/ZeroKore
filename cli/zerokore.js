@@ -6,12 +6,12 @@
  * ZeroKore CLI.
  *
  * A real client for the same account and projects the web app uses. Every
- * command performs a real HTTP call against the API ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â there is no local
+ * command performs a real HTTP call against the API — there is no local
  * simulation and no offline mode that pretends to have worked.
  *
  * Auth: `zerokore login` exchanges your email and password for a Supabase access
  * token and stores it in ~/.zerokore/config.json (mode 0600). That token is sent
- * as `Authorization: Bearer ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦`, which the API verifies server-side.
+ * as `Authorization: Bearer <token>`, which the API verifies server-side.
  */
 
 const fs = require("fs");
@@ -80,7 +80,7 @@ function ask(question) {
  *
  * A Supabase access token lasts about an hour. Without this the CLI simply
  * started failing with 401 some time after `login`, and the only remedy was to
- * type the password again ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â not something a tool should demand. The refresh
+ * type the password again — not something a tool should demand. The refresh
  * token is long-lived, so it is stored alongside and swapped silently; a
  * failure here is not fatal, the next call just surfaces the 401.
  */
@@ -146,7 +146,7 @@ async function api(pathname, options = {}) {
 }
 
 /**
- * The public Supabase config is embedded in the site's client bundle ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â it is
+ * The public Supabase config is embedded in the site's client bundle — it is
  * public by design, and reading it here means the CLI needs no local setup.
  */
 async function publicSupabaseConfig() {

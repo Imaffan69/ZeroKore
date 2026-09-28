@@ -1,8 +1,8 @@
 {
   "name": "zerokore",
   "version": "1.0.0",
-  "private": true,
   "description": "ZeroKore — production-grade autonomous agentic AI platform",
+  "private": true,
   "main": "desktop/main.js",
   "scripts": {
     "dev": "next dev -p 3000 -H 0.0.0.0",
@@ -14,7 +14,9 @@
     "desktop:package": "electron-builder --win --x64",
     "desktop:dir": "electron-builder --win --x64 --dir",
     "zerokore": "node cli/zerokore.js",
-    "cli": "node cli/zerokore.js"
+    "cli": "node cli/zerokore.js",
+    "cli:pack": "npm pack --pack-destination ./release/cli",
+    "cli:publish": "npm publish --access public --registry https://registry.npmjs.org/"
   },
   "bin": {
     "zerokore": "cli/zerokore.js"

@@ -17,6 +17,9 @@ const config: Config = {
           accent: "#b5cfa0",
           accentDim: "#8fbf7f",
           mint: "#4ade80",
+          // Softer green used where a full-strength mint reads as too loud,
+          // e.g. environment-variable names in the admin model table.
+          sage: "#8fbf7f",
           text: "#f4f4f6",
           body: "#d7d7dc",
           muted: "#b8b8c0",

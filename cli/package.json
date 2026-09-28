@@ -1,0 +1,22 @@
+{
+  "name": "zerokore",
+  "version": "1.0.0",
+  "description": "ZeroKore CLI — drive your ZeroKore projects, files and agent from the terminal",
+  "license": "UNLICENSED",
+  "bin": {
+    "zerokore": "zerokore.js"
+  },
+  "files": [
+    "zerokore.js"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "zerokore",
+    "ai",
+    "agent",
+    "cli"
+  ],
+  "dependencies": {}
+}

@@ -45,11 +45,19 @@ function detect(): Platform {
 }
 
 const CLI_COMMANDS = [
-  { label: "Run it from the repo", command: "npx zerokore login", note: "No global install." },
-  { label: "Install globally", command: "npm install -g zerokore", note: "Then: zerokore" },
+  {
+    label: "Install globally",
+    command: "npm install -g zerokore",
+    note: "Then run: zerokore login",
+  },
+  {
+    label: "Or run without installing",
+    command: "npx zerokore login",
+    note: "No global install needed.",
+  },
   {
     label: "Build the desktop app",
-    command: "npm install && npm run desktop:package",
+    command: "npm run desktop:package",
     note: "Writes the installer to release/.",
   },
 ];
@@ -277,13 +285,23 @@ export default function DownloadPage() {
           </div>
         </motion.section>
 
+        <p className="mt-4 text-xs leading-relaxed text-kore-muted">
+          The CLI is a single self-contained file with no runtime
+          dependencies, so the global install is about 5 kB and pulls nothing
+          else. If <code className="font-mono">npm install -g zerokore</code>
+          reports that the package is not found, it is not on the public
+          registry yet — use <code className="font-mono">npx zerokore</code> or
+          run it from a clone with <code className="font-mono">npm run cli</code>.
+        </p>
+
         <p className="mt-8 text-xs leading-relaxed text-kore-muted">
           The installer is published as a GitHub release rather than hosted by
-          the site, so the 166 MB binary is served from the release CDN instead of
-          on every page load. If the direct link 404s, build it yourself with{" "}
+          the site, so the 166 MB binary is served from the release CDN instead
+          of on every page load. If the direct link 404s, build it yourself with{" "}
           <code className="font-mono">npm run desktop:package</code> — it lands in{" "}
           <code className="font-mono">release/</code>.
         </p>
+
       </div>
     </main>
   );
