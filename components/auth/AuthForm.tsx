@@ -70,7 +70,29 @@ function recordSignIn(event: "login" | "signup") {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ event }),
       keepalive: true,
-    }).catch(() => undefined);
+    })
+      .then(async (res) => {
+        if (!res.ok) return;
+        const body = (await res.json().catch(() => ({}))) as {
+          needsHint?: boolean;
+          eventId?: string | null;
+        };
+        // The server could not see a routable client address — usually a proxy
+        // in front of the app that does not forward it. Ask the browser what it
+        // sees and correct the row already written, so the admin panel shows
+        // real per-device addresses instead of one shared infrastructure IP.
+        if (!body.needsHint) return;
+        const { fetchClientIp } = await import("@/lib/client-ip");
+        const ip = await fetchClientIp();
+        if (!ip) return;
+        await fetch("/api/account/activity", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ event, ipHint: ip, amendEventId: body.eventId ?? undefined }),
+          keepalive: true,
+        }).catch(() => undefined);
+      })
+      .catch(() => undefined);
   } catch {
     // never surface a telemetry failure to the user
   }

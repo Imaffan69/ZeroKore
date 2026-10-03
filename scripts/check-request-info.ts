@@ -3,7 +3,7 @@
  * Verifies that different devices behind the same proxy resolve to different
  * addresses, and that coordinates survive the provider chain.
  */
-import { extractIp, normalizeIp, isPublicIp, geolocateIp } from "../lib/request-info";
+import { extractIp, normalizeIp, isPublicIp, geolocateIp, resolveIp, CLIENT_IP_COOKIE } from "../lib/request-info";
 
 function req(headers: Record<string, string>): Request {
   return new Request("https://example.test/", { headers });
@@ -63,6 +63,49 @@ check(
 
 check("local dev falls back", extractIp(req({ "x-forwarded-for": "127.0.0.1" })), "127.0.0.1");
 check("no headers", extractIp(req({})), null);
+
+// resolveIp — the reported-address fallback. Header parsing cannot recover a
+// visitor's address when a proxy does not forward it, so the browser's own
+// value is used instead, and never mistaken for something the server saw.
+check(
+  "header wins over a reported address",
+  resolveIp(req({ "x-forwarded-for": "8.8.8.8" }), "1.1.1.1").source,
+  "header:x-forwarded-for"
+);
+
+check(
+  "reported address used when the proxy hides it",
+  resolveIp(req({ "x-real-ip": "10.0.0.7", "x-forwarded-for": "10.0.0.7" }), "8.8.8.8"),
+  { ip: "8.8.8.8", source: "client-reported", chain: ["10.0.0.7", "10.0.0.7"] }
+);
+
+check(
+  "reported cookie is used on later requests",
+  resolveIp(
+    req({ cookie: `theme=dark; ${CLIENT_IP_COOKIE}=1.1.1.1` })
+  ).source,
+  "client-reported"
+);
+
+check(
+  "a spoofed private address is rejected",
+  resolveIp(req({ "x-forwarded-for": "10.0.0.7" }), "192.168.1.5").ip,
+  "10.0.0.7"
+);
+
+check(
+  "junk hint is ignored",
+  resolveIp(req({ "x-forwarded-for": "10.0.0.7" }), "not-an-ip").source,
+  "header-fallback"
+);
+
+check(
+  "nothing available at all",
+  resolveIp(req({}), "1.1.1.1").source,
+  "client-reported"
+);
+
+check("extractIp still matches resolveIp", extractIp(req({ "x-forwarded-for": "8.8.8.8" })), "8.8.8.8");
 
 // geolocation chain — 8.8.8.8 is public and stable, so a lookup must place it.
 const geo = await geolocateIp("8.8.8.8");

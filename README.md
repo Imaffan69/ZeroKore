@@ -84,7 +84,6 @@ zerokore/
    | `GITHUB_CLIENT_SECRET` | for GitHub import/push | OAuth app client secret |
    | `ENCRYPTION_KEY` | for project secrets | 32-byte key (base64 or 64-char hex) |
 | `IP_LOCATION_API` | no | ipgeolocation.io key for the admin IP map. Optional: without it the panel falls back to keyless providers (ipwho.is, then ip-api.com) and still resolves latitude/longitude. |
-| `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | no | Google Maps **Embed API** key. Enables the "Google" tab on the per-user map in **Security & IPs**. Without it that tab explains what is missing and links out to Google Maps; OpenStreetMap needs no key. |
 
    `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` come from an OAuth app at
    https://github.com/settings/developers with the callback URL set to
@@ -175,7 +174,32 @@ quoted strings, `::ffff:` mapped IPv4) so one device cannot appear as several
 visitors. Locations come from ipgeolocation.io when `IP_LOCATION_API` is set,
 otherwise from keyless providers; coordinates of `0,0` are treated as "unknown"
 rather than plotted in the ocean. **Security & IPs** groups this per user and per
-device and gives each user their own map.
+device and gives each user their own map — rendered with **OpenStreetMap**,
+which needs no API key, no account and no signup, so the panel cannot end up
+with a dead map because a key was never added.
+
+**When the deployment hides the address.** Header parsing cannot recover an
+address the network never sent. Behind a proxy, tunnel or hosting layer that
+does not forward the client's IP, every request arrives carrying the same
+infrastructure address — and no header change fixes that. So:
+
+1. Every event records **where its address came from** (`detail.ipSource`:
+   `header:<name>`, `client-reported`, `header-fallback`, `legacy`) and the panel
+   shows it next to each address.
+2. If one address covers ≥80% of events the panel says so outright and names the
+   likely cause instead of leaving staff to guess.
+3. On sign-in the server tells the client when it could not see a routable
+   address; the browser then asks a **keyless, CORS-enabled** echo service
+   (`api.ipify.org`, one request, no account, no tracking identifier) what *it*
+   sees, and the row already written is corrected in place — no duplicate event.
+   The value is cached in `sessionStorage` and in a 12-hour `zk_client_ip`
+   cookie, so **every** later server-recorded event (agent runs, file edits,
+   GitHub syncs) carries the same real address. A healthy deployment makes zero
+   requests to that service.
+
+A reported address is labelled `client-reported` in the audit trail and the panel
+— it is never presented as something the server observed. Rows recorded before
+this existed cannot be reconstructed.
 
 ## Database & RLS
 

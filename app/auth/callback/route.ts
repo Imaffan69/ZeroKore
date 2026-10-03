@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { NEEDS_IP_COOKIE } from "@/lib/client-ip";
 
 /**
  * OAuth completion (PKCE).
@@ -22,6 +23,9 @@ export async function GET(req: Request) {
   const origin = url.origin;
   const code = url.searchParams.get("code");
   const next = safeNext(url.searchParams.get("next"));
+  // Set when this sign-in could not be attributed to a routable client address,
+  // so the browser is asked for its own once it is back on the site.
+  let needsIp = false;
   const providerError =
     url.searchParams.get("error_description") ?? url.searchParams.get("error");
 
@@ -52,10 +56,14 @@ export async function GET(req: Request) {
       // path that never passed through a logged event.
       const user = data?.user;
       if (user) {
-        const { logActivity } = await import("@/lib/request-info");
+        const { logActivity, resolveIp } = await import("@/lib/request-info");
         // A brand-new account is a signup; a returning one is a login.
         const createdAt = user.created_at ? new Date(user.created_at).getTime() : 0;
         const isNew = createdAt > 0 && Date.now() - createdAt < 5 * 60 * 1000;
+        // If the deployment did not forward the visitor's address, the browser
+        // is asked for it once it lands back on the site — OAuth never passes
+        // through the sign-in form that normally does this.
+        if (!resolveIp(req).source.startsWith("header:")) needsIp = true;
         await logActivity(
           user.id,
           isNew ? "signup" : "login",
@@ -70,5 +78,23 @@ export async function GET(req: Request) {
     }
   }
 
-  return NextResponse.redirect(new URL(next, origin));
+  return finish(next, origin, needsIp);
+}
+
+/**
+ * The redirect out of the callback, carrying the flag that asks the browser to
+ * supply its own address when the server could not see one.
+ */
+function finish(next: string, origin: string, needsIp: boolean): NextResponse {
+  const response = NextResponse.redirect(new URL(next, origin));
+  if (needsIp) {
+    response.cookies.set(NEEDS_IP_COOKIE, "1", {
+      path: "/",
+      maxAge: 60 * 60 * 12,
+      sameSite: "lax",
+      // Read by the browser bootstrap component after the redirect lands.
+      httpOnly: false,
+    });
+  }
+  return response;
 }

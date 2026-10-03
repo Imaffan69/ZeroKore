@@ -162,6 +162,7 @@ export async function GET() {
         asn: text(d.asn),
         network: text(d.network),
         geoProvider: live ? "resolved-live" : text(d.geoProvider),
+        ipSource: text(d.ipSource) ?? "legacy",
         device: text(d.device) ?? describeDevice(r.user_agent),
         userAgent: r.user_agent,
         precise: d.precise === true || Boolean(live),
@@ -208,6 +209,7 @@ export async function GET() {
       asn: string | null;
       network: string | null;
       geoProvider: string | null;
+      ipSource: string;
       devices: string[];
     };
     const byUser = new Map<
@@ -248,6 +250,7 @@ export async function GET() {
           asn: e.asn,
           network: e.network,
           geoProvider: e.geoProvider,
+          ipSource: e.ipSource,
           devices: [],
         };
       device.count += 1;
@@ -295,6 +298,13 @@ export async function GET() {
     const last24h = Date.now() - 24 * 60 * 60 * 1000;
     const recent = rows.filter((r) => new Date(r.created_at).getTime() > last24h);
 
+    // Why the addresses look the way they do. A single address covering almost
+    // every event is the signature of a proxy that is not forwarding the
+    // visitor's, and the panel says so instead of leaving staff to guess.
+    const topIp = visitors[0] ?? null;
+    const clientReported = events.filter((e) => e.ipSource === "client-reported").length;
+    const sharedIp = topIp !== null && topIp.count / Math.max(1, events.length) >= 0.8;
+
     return NextResponse.json({
       events,
       countries,
@@ -302,6 +312,12 @@ export async function GET() {
       users,
       located: events.filter((e) => e.latitude !== null).length,
       total: rows.length,
+      diagnostics: {
+        sharedIp,
+        topIp: topIp?.ip ?? null,
+        topIpShare: topIp ? topIp.count / Math.max(1, events.length) : 0,
+        clientReported,
+      },
       summary: {
         events24h: recent.length,
         uniqueIps: byIp.size,
