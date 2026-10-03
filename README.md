@@ -83,6 +83,8 @@ zerokore/
    | `GITHUB_CLIENT_ID` | for GitHub import/push | OAuth app client id |
    | `GITHUB_CLIENT_SECRET` | for GitHub import/push | OAuth app client secret |
    | `ENCRYPTION_KEY` | for project secrets | 32-byte key (base64 or 64-char hex) |
+| `IP_LOCATION_API` | no | ipgeolocation.io key for the admin IP map. Optional: without it the panel falls back to keyless providers (ipwho.is, then ip-api.com) and still resolves latitude/longitude. |
+| `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | no | Google Maps **Embed API** key. Enables the "Google" tab on the per-user map in **Security & IPs**. Without it that tab explains what is missing and links out to Google Maps; OpenStreetMap needs no key. |
 
    `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` come from an OAuth app at
    https://github.com/settings/developers with the callback URL set to
@@ -163,6 +165,17 @@ Signup and sign-in events record IP address, approximate location derived from
 that IP, and device/browser from the user-agent (`login_events`, surfaced to
 staff in **Security & IPs** and to the account owner in **Sign-in & security**).
 This is disclosed in `/privacy`. Nothing here is used for advertising.
+
+**How the address is captured.** `lib/request-info.ts` walks the proxy headers
+(`cf-connecting-ip`, `true-client-ip`, `x-forwarded-for`, …) and keeps the first
+**public** hop. `x-real-ip` is consulted last on purpose: behind a CDN or hosting
+proxy it is frequently the *proxy's* address, which is what made two devices of
+one account show the same IP. Header values are normalised (brackets, ports,
+quoted strings, `::ffff:` mapped IPv4) so one device cannot appear as several
+visitors. Locations come from ipgeolocation.io when `IP_LOCATION_API` is set,
+otherwise from keyless providers; coordinates of `0,0` are treated as "unknown"
+rather than plotted in the ocean. **Security & IPs** groups this per user and per
+device and gives each user their own map.
 
 ## Database & RLS
 

@@ -5,6 +5,66 @@ was actually verified. Deployment is via `git push origin main` → Vercel.
 
 ---
 
+## 2026-10-03 — Admin IPs are per device, and every user gets their own map
+
+**Every device of every user showed the same IP**
+- `extractIp()` consulted `x-real-ip` **first**. Behind a CDN, the Vercel firewall
+  or any hosting proxy that header is usually the *proxy's* address, not the
+  visitor's — so every sign-in in the admin panel collapsed onto one shared IP,
+  which is exactly the "same user, different devices, same IP" report.
+- Fix: the proxy chain is walked in authority order (`cf-connecting-ip`,
+  `true-client-ip`, `x-client-ip`, `fly-client-ip`, `fastly-client-ip`,
+  `x-vercel-forwarded-for`, `x-forwarded-for`, `x-forwarded`, `x-real-ip` last)
+  and the **first public hop** wins, so an internal load balancer is skipped
+  rather than reported as the visitor. Header values are normalised (bracketed
+  IPv6, `host:port`, quoted strings, `::ffff:` mapped IPv4), and `isPublicIp`
+  now also rejects CGNAT, link-local, multicast, reserved and documentation
+  ranges.
+
+**The map was empty because one provider with one key was the only path**
+- A missing/unconfigured `IP_LOCATION_API` meant `lookupGeo` returned `null`:
+  no latitude, no longitude, nothing to plot. There was no fallback and no way
+  to see why.
+- Fix: a provider chain — ipgeolocation.io when `IP_LOCATION_API` (or an alias)
+  is configured, then keyless `ipwho.is`, then keyless `ip-api.com`. Whichever
+  answers supplies country, region, city, **latitude/longitude**, timezone, ASN
+  and network; the provider is recorded so the panel can show its source.
+  `0,0` is rejected as "unplaced" rather than drawn in the Gulf of Guinea, and
+  results are cached for 6h (5 min on failure). `geolocateIp()` is exported so
+  the panel can fill in coordinates for rows that predate the enrichment.
+
+**Security & IPs is now per user, per device, per map**
+- `GET /api/admin/security` returns a `users[]` breakdown: each account with its
+  devices (IP, hit count, last seen, device string, city/region/country,
+  latitude/longitude, timezone, ASN, network). Addresses with no stored
+  coordinates are resolved live, capped at 40 per refresh, so historical rows
+  appear on the map too. Every event row now carries top-level coordinates
+  instead of a jsonb blob the client had to dig through.
+- `AdminSecurity` gained a per-user section: open a user to see every device,
+  the full IP details, and **that user's own map**. Picking a device re-centres
+  the map on that address.
+- `components/admin/UserMap.tsx` is the widget: a keyless OpenStreetMap embed by
+  default, a Google Maps Embed API tab when `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` is
+  set (Google retired its keyless iframe embed — verified: it 404s), plus a
+  working "open in Google Maps" link. No mapping SDK is bundled, tiles are
+  filtered to the panel's monochrome, and the iframe only mounts when a card is
+  opened.
+- The world overview now plots **one pin per user+address** instead of stacking
+  every event, and its markers are monochrome to match the design system.
+
+**Verification**
+- `bun scripts/check-request-info.ts` — new, 18 assertions: header precedence,
+  chain parsing, normalisation of bracketed/port/quoted/mapped-IPv4 values,
+  reserved-range rejection, and two devices behind one proxy resolving to two
+  different addresses. Live lookup of `8.8.8.8` returned
+  `37.3393939, -121.8949553` via ipwho.is. **All checks passed.**
+- `bunx tsc --noEmit` clean · `next lint` clean · `next build
+  --experimental-build-mode compile` clean.
+- Embed endpoints checked over the network: OpenStreetMap embed **200**,
+  Google Maps embed **404** (hence the API-key tab), Google Maps link **200**.
+
+---
+
 ## 2026-09-25 — Sign-in 500 and suspended-account UX
 
 **The 500 affecting every signed-in user**
