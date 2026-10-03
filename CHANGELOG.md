@@ -5,6 +5,36 @@ was actually verified. Deployment is via `git push origin main` → Vercel.
 
 ---
 
+## 2026-10-03 (c) — `login_events` accepted only 7 of the 12 events the app writes
+
+**Migration 009 — agent runs, file edits and GitHub syncs were never stored**
+- `lib/request-info.ts` declares twelve `ActivityEvent` values, but migration 001
+  created `login_events.event` with a `check (event in (...))` constraint listing
+  only the original seven auth events. Every `agent_run`, `file_edit`,
+  `project_create`, `github_sync` and `page_view` insert failed with 23514
+  (check violation); the insert's own retry without `detail` failed identically,
+  and `logActivity` swallows failures by design — so those rows were **never
+  written**. Nothing in the UI said so: the events simply did not exist.
+- This quietly defeated part of the previous entry. The browser-reported address
+  is cached in a cookie precisely so *server-recorded* activity carries the real
+  visitor address, but those events never reached the table, so the panel could
+  not show them and the ≥80% shared-address diagnostic was computed over sign-ins
+  only.
+- `supabase/migrations/009_login_event_scope.sql` drops and re-adds the
+  constraint with all twelve values. Existing rows only ever held values from the
+  old list, so it validates cleanly. Safe to re-run.
+
+**Verification**
+- Read the schema and the logger together: 001 declares the seven-value check,
+  `ActivityEvent` declares twelve, and the only widened path
+  (`/api/account/activity`) accepts `login`/`signup` — so `agent_run`,
+  `file_edit`, `project_create` and `github_sync` could not be written. Confirmed
+  `app/api/admin/security` selects all rows with no event filter, so the missing
+  constraint is the whole cause. SQL change only; no TypeScript touched, so the
+  existing typecheck/lint/build results still hold.
+
+---
+
 ## 2026-10-03 (b) — The address the network hides: reported-IP fallback and diagnostics
 
 **Header fixes alone could not help** — reported after the previous entry as
