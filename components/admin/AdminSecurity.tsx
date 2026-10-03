@@ -11,7 +11,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import VisitorMap, { type MapPoint } from "@/components/admin/VisitorMap";
-import UserMap, { type MapProvider } from "@/components/admin/UserMap";
+import UserMap from "@/components/admin/UserMap";
 import { cn } from "@/lib/utils";
 
 interface SecurityEvent {
@@ -108,7 +108,6 @@ function coords(lat: number | null, lon: number | null): string {
  */
 function UserCard({ user }: { user: UserRow }) {
   const [open, setOpen] = useState(false);
-  const [provider, setProvider] = useState<MapProvider>("osm");
   const [selectedIp, setSelectedIp] = useState<string | null>(null);
 
   const located = user.devices.filter(
@@ -194,8 +193,6 @@ function UserCard({ user }: { user: UserRow }) {
                 longitude={selected.longitude as number}
                 label={`${user.user} · ${selected.ip}`}
                 caption={[selected.city, selected.country].filter(Boolean).join(", ")}
-                provider={provider}
-                onProviderChange={setProvider}
               />
             ) : (
               <div className="flex h-56 items-center justify-center rounded-xl border border-dashed border-white/10 px-4 text-center text-xs text-kore-muted">

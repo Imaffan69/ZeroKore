@@ -43,12 +43,12 @@ was actually verified. Deployment is via `git push origin main` → Vercel.
 - `AdminSecurity` gained a per-user section: open a user to see every device,
   the full IP details, and **that user's own map**. Picking a device re-centres
   the map on that address.
-- `components/admin/UserMap.tsx` is the widget: a keyless OpenStreetMap embed by
-  default, a Google Maps Embed API tab when `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` is
-  set (Google retired its keyless iframe embed — verified: it 404s), plus a
-  working "open in Google Maps" link. No mapping SDK is bundled, tiles are
-  filtered to the panel's monochrome, and the iframe only mounts when a card is
-  opened.
+- `components/admin/UserMap.tsx` is the widget: a **keyless OpenStreetMap** embed.
+  No API key, no account, no signup, so the panel cannot end up with a dead map
+  because a key was never added; no commercial map provider is involved at all.
+  It adds copy-coordinates and a deep link to OpenStreetMap. No mapping SDK is
+  bundled, tiles are filtered to the panel's monochrome, and the iframe only
+  mounts when a card is opened.
 - The world overview now plots **one pin per user+address** instead of stacking
   every event, and its markers are monochrome to match the design system.
 
@@ -60,8 +60,8 @@ was actually verified. Deployment is via `git push origin main` → Vercel.
   `37.3393939, -121.8949553` via ipwho.is. **All checks passed.**
 - `bunx tsc --noEmit` clean · `next lint` clean · `next build
   --experimental-build-mode compile` clean.
-- Embed endpoints checked over the network: OpenStreetMap embed **200**,
-  Google Maps embed **404** (hence the API-key tab), Google Maps link **200**.
+- Map endpoints checked over the network: OpenStreetMap embed **200**, OpenStreetMap
+  deep link **200**.
 
 ---
 
