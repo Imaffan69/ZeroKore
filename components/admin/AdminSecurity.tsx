@@ -28,6 +28,7 @@ interface SecurityEvent {
   asn: string | null;
   network: string | null;
   geoProvider: string | null;
+  ipSource: string;
   device: string;
   precise: boolean;
   created_at: string;
@@ -46,6 +47,7 @@ interface DeviceRow {
   asn: string | null;
   network: string | null;
   geoProvider: string | null;
+  ipSource: string;
   devices: string[];
 }
 
@@ -80,6 +82,12 @@ interface SecurityPayload {
   visitors: Visitor[];
   located: number;
   total: number;
+  diagnostics: {
+    sharedIp: boolean;
+    topIp: string | null;
+    topIpShare: number;
+    clientReported: number;
+  };
   summary: {
     events24h: number;
     uniqueIps: number;
@@ -97,6 +105,15 @@ function when(iso: string): string {
 function coords(lat: number | null, lon: number | null): string {
   if (lat === null || lon === null) return "not resolved";
   return `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+}
+
+/** Plain-language reading of where an address came from. */
+function sourceLabel(source: string): string {
+  if (source === "client-reported") return "reported by browser";
+  if (source === "legacy") return "recorded before tracking";
+  if (source.startsWith("header:")) return source.slice("header:".length);
+  if (source === "header-fallback") return "private address (no client IP forwarded)";
+  return "unknown";
 }
 
 /**
@@ -167,17 +184,17 @@ function UserCard({ user }: { user: UserRow }) {
                   <span className="mt-0.5 block text-[11px] text-kore-muted">
                     {[d.city, d.region, d.country].filter(Boolean).join(", ") || "Unknown"}{" "}
                     · {coords(d.latitude, d.longitude)}
-                  </span>
-                  <span className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 font-mono text-[10px] text-kore-faint">
-                    <span className="inline-flex items-center gap-1">
-                      <Laptop className="h-3 w-3" aria-hidden />
-                      {d.devices.join(" / ") || "Unknown device"}
+                  </span><span className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 font-mono text-[10px] text-kore-faint">
+                      <span className="inline-flex items-center gap-1">
+                        <Laptop className="h-3 w-3" aria-hidden />
+                        {d.devices.join(" / ") || "Unknown device"}
+                      </span>
+                      <span title={`source: ${d.ipSource}`}>via {sourceLabel(d.ipSource)}</span>
+                      {d.timezone && <span>{d.timezone}</span>}
+                      {d.asn && <span>AS{d.asn}</span>}
+                      {d.network && <span className="truncate">{d.network}</span>}
+                      {!placeable && <span>no coordinates</span>}
                     </span>
-                    {d.timezone && <span>{d.timezone}</span>}
-                    {d.asn && <span>AS{d.asn}</span>}
-                    {d.network && <span className="truncate">{d.network}</span>}
-                    {!placeable && <span>no coordinates</span>}
-                  </span>
                 </button>
               );
             })}
@@ -339,6 +356,30 @@ export default function AdminSecurity() {
         </div>
       </div>
 
+      {/* When every event arrives on one address, say so and say why: this is
+          the signature of a proxy that is not forwarding the visitor's IP, and
+          it is invisible unless the panel names it. */}
+      {data.diagnostics?.sharedIp && (
+        <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-200">
+          <p className="font-medium">
+            Almost all activity is arriving on one address{" "}
+            <span className="font-mono">{data.diagnostics.topIp}</span> (
+            {Math.round(data.diagnostics.topIpShare * 100)}% of events).
+          </p>
+          <p className="mt-1 text-amber-200/80">
+            That is what a proxy or tunnel in front of the app looks like when it
+            does not forward the visitor&rsquo;s address — the server sees only its
+            own infrastructure IP, so every device looks identical. Browsers now
+            report their own address as a fallback
+            {data.diagnostics.clientReported > 0
+              ? ` (${data.diagnostics.clientReported} events so far)`
+              : ""}
+            ; rows marked &ldquo;recorded before tracking&rdquo; predate it and
+            cannot be reconstructed.
+          </p>
+        </div>
+      )}
+
       {/* World map — one pin per user and address, placed from the coordinates
           resolved for that IP. Rows without a coordinate are skipped, never
           guessed. */}
@@ -442,7 +483,12 @@ export default function AdminSecurity() {
                   </span>
                 </td>
                 <td className="px-4 py-2.5 font-mono text-kore-muted">{e.user}</td>
-                <td className="px-4 py-2.5 font-mono text-kore-text">{e.ip ?? "—"}</td>
+                <td className="px-4 py-2.5 font-mono text-kore-text">
+                  {e.ip ?? "—"}
+                  <span className="block text-[10px] text-kore-faint">
+                    {sourceLabel(e.ipSource)}
+                  </span>
+                </td>
                 <td className="px-4 py-2.5 text-kore-text">
                   {[e.city, e.region, e.country].filter(Boolean).join(", ") || "—"}
                 </td>

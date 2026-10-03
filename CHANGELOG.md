@@ -5,6 +5,51 @@ was actually verified. Deployment is via `git push origin main` → Vercel.
 
 ---
 
+## 2026-10-03 (b) — The address the network hides: reported-IP fallback and diagnostics
+
+**Header fixes alone could not help** — reported after the previous entry as
+"IP is still the same all over". Correct, and the reason is structural: when the
+app sits behind a proxy, tunnel or hosting layer that does **not forward** the
+visitor's address, every request arrives carrying the same infrastructure IP.
+No header parsing can recover what the network never sent, so the previous
+change could only fix mis-ordered headers, not a missing address.
+- `resolveIp()` now returns the address **and where it came from**
+  (`detail.ipSource`: `header:<name>`, `client-reported`, `header-fallback`,
+  `legacy`) plus the exact chain it saw. `extractIp()` delegates to it.
+- When headers yield nothing routable, the browser reports its own address
+  (`lib/client-ip.ts` → `api.ipify.org`, keyless, CORS `*`, one request per
+  session, cached in `sessionStorage`). `POST /api/account/activity` answers with
+  `needsHint`, and the follow-up call **amends the row it already wrote** rather
+  than inserting a second sign-in event. Private/spoofed hints are rejected.
+- The value is also cached in a 12-hour `zk_client_ip` cookie, so server-recorded
+  events — agent runs, file edits, GitHub syncs — carry the same real address
+  instead of the shared one. A healthy deployment makes **zero** third-party calls.
+- OAuth sign-ins are covered too. They leave the browser entirely (Supabase →
+  `/auth/callback`), so the sign-in form's request never runs. `/auth/callback`
+  now sets a `zk_needs_ip` flag when it could not see a routable address, and
+  `ClientIpBootstrap` (mounted in the authenticated dashboard layout) answers it
+  once the browser is back, writing the same cookie. Without this, Google/GitHub
+  users kept the shared address while email users were fixed.
+- The panel names the cause: when one address covers ≥80% of events a banner
+  explains that the deployment is not forwarding client IPs, and every address
+  row shows its source. Reported addresses are labelled `reported by browser` and
+  never passed off as server-observed.
+- Google Maps removed from the map widget (see previous entry): OpenStreetMap
+  only, plus copy-coordinates and an OpenStreetMap deep link.
+
+**Verification**
+- `bun scripts/check-request-info.ts` — now 25 assertions: header precedence,
+  header-over-hint precedence, hint used when the proxy hides the address, the
+  cookie path, private/junk hints rejected, `extractIp` parity, normalisation,
+  reserved ranges, and a live `8.8.8.8` lookup → `37.3393939, -121.8949553`.
+  **exit 0.**
+- `api.ipify.org` and `api64.ipify.org` checked with an `Origin` header: **200**
+  with `access-control-allow-origin: *`, so the browser call works.
+- `tsc --noEmit` exit 0 · `next lint` (whole `app`, `components`, `lib`) exit 0 ·
+  `next build --experimental-build-mode compile` exit 0.
+
+---
+
 ## 2026-10-03 — Admin IPs are per device, and every user gets their own map
 
 **Every device of every user showed the same IP**

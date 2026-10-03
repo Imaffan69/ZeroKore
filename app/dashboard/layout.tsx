@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import ClientIpBootstrap from "@/components/auth/ClientIpBootstrap";
 
 export const metadata: Metadata = {
   title: "Workspace — ZeroKore",
@@ -47,6 +48,10 @@ export default async function DashboardLayout({
 
   return (
     <div className="flex h-dvh overflow-hidden bg-kore-bg text-kore-text">
+      {/* Establishes the visitor's reported address for OAuth sign-ins, so
+          agent runs and other server-recorded events carry it too. Renders
+          nothing and does no work on a healthy deployment. */}
+      <ClientIpBootstrap />
       {children}
     </div>
   );

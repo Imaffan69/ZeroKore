@@ -22,6 +22,10 @@ export interface RequestInfo {
   network?: string | null;
   /** Which geolocation provider answered, when a lookup actually ran. */
   geoProvider?: string | null;
+  /** Which header (or the client fallback) the address came from. */
+  ipSource?: string;
+  /** The proxy chain exactly as it arrived, for diagnosing a shared address. */
+  ipChain?: string[];
 }
 
 /**
@@ -92,31 +96,99 @@ export function normalizeIp(raw: string | null | undefined): string | null {
  * address is returned so the record is still meaningful.
  */
 export function extractIp(req: Request): string | null {
+  return resolveIp(req).ip;
+}
+
+/** Where an address came from. Surfaced in the admin panel so a collapse to one
+ *  shared value is diagnosable instead of mysterious. */
+export interface IpResolution {
+  ip: string | null;
+  /** `header:<name>`, `header-fallback`, `client-reported`, or `none`. */
+  source: string;
+  /** Every address seen in the proxy chain, in the order they were seen. */
+  chain: string[];
+}
+
+/** Cookie the browser writes once it has learned its own public address. */
+export const CLIENT_IP_COOKIE = "zk_client_ip";
+
+/** Read the browser-reported address a previous page load left behind. */
+function cookieHint(req: Request): string | null {
+  const raw = req.headers.get("cookie");
+  if (!raw) return null;
+  for (const part of raw.split(";")) {
+    const eq = part.indexOf("=");
+    if (eq === -1) continue;
+    if (part.slice(0, eq).trim() !== CLIENT_IP_COOKIE) continue;
+    try {
+      return decodeURIComponent(part.slice(eq + 1).trim()) || null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+/**
+ * Resolve the visitor's address *and say where it came from*.
+ *
+ * Header extraction alone is not always enough: when the app sits behind a proxy
+ * or tunnel that does not forward the visitor's address, every request arrives
+ * with the same infrastructure address and no header change can recover the
+ * real one. In that case the address the browser reported (an explicit `hint`,
+ * or the one cached in a cookie by an earlier page load) is used instead —
+ * validated as a routable address and recorded as `client-reported`, so the
+ * audit trail never passes it off as something the server observed.
+ *
+ * The cookie is what makes this cover *every* event, not just sign-in: once the
+ * browser has fetched its address once per session, agent runs, file edits and
+ * GitHub syncs recorded server-side read it too.
+ */
+export function resolveIp(req: Request, hint?: string | null): IpResolution {
   const h = req.headers;
+  const chain: string[] = [];
   let fallback: string | null = null;
+
   for (const name of IP_HEADERS) {
     const raw = h.get(name);
     if (!raw) continue;
     for (const part of raw.split(",")) {
       const ip = normalizeIp(part);
       if (!ip) continue;
-      if (isPublicIp(ip)) return ip;
+      chain.push(ip);
+      if (isPublicIp(ip)) return { ip, source: `header:${name}`, chain };
       fallback ??= ip;
     }
   }
-  return fallback;
+
+  const reported = normalizeIp(hint ?? cookieHint(req));
+  if (reported && isPublicIp(reported)) {
+    return { ip: reported, source: "client-reported", chain };
+  }
+
+  return {
+    ip: fallback,
+    source: fallback ? "header-fallback" : "none",
+    chain,
+  };
 }
 
-export function extractRequestInfo(req: Request): RequestInfo {
+export function extractRequestInfo(
+  req: Request,
+  hint?: string | null
+): RequestInfo {
   const h = req.headers;
   const ua = h.get("user-agent");
+  const resolved = resolveIp(req, hint);
   return {
-    ip: extractIp(req),
+    ip: resolved.ip,
     country: h.get("x-vercel-ip-country") ?? h.get("cf-ipcountry"),
     city: h.get("x-vercel-ip-city"),
     userAgent: ua,
     device: describeDevice(ua),
     precise: false,
+    ipSource: resolved.source,
+    ipChain: resolved.chain,
   };
 }
 
@@ -334,8 +406,11 @@ export function isPublicIp(ip: string | null): boolean {
 }
 
 /** Request info enriched with a real geolocation lookup when one is available. */
-export async function describeRequest(req: Request): Promise<RequestInfo> {
-  const base = extractRequestInfo(req);
+export async function describeRequest(
+  req: Request,
+  hint?: string | null
+): Promise<RequestInfo> {
+  const base = extractRequestInfo(req, hint);
   if (!base.ip) return base;
   const geo = await geolocateIp(base.ip);
   if (!geo) return base;
@@ -429,13 +504,14 @@ export async function logActivity(
   userId: string,
   event: ActivityEvent,
   req: Request,
-  detail: Record<string, unknown> = {}
-): Promise<void> {
+  detail: Record<string, unknown> = {},
+  options: { ipHint?: string | null } = {}
+): Promise<string | null> {
   try {
-    const info = await describeRequest(req);
+    const info = await describeRequest(req, options.ipHint ?? null);
     const { createServiceClient } = await import("@/lib/supabase/server");
     const svc = await createServiceClient();
-    const { error } = await svc.from("login_events").insert({
+    const { data, error } = await svc.from("login_events").insert({
       user_id: userId,
       event,
       ip: info.ip,
@@ -446,18 +522,7 @@ export async function logActivity(
       // It is written apart from the core columns so a database that has not
       // applied that migration still records the sign-in, rather than the whole
       // insert failing on an unknown column and losing the event entirely.
-      detail: {
-        ...detail,
-        device: info.device,
-        region: info.region,
-        latitude: info.latitude,
-        longitude: info.longitude,
-        timezone: info.timezone,
-        asn: info.asn,
-        network: info.network,
-        precise: info.precise,
-        geoProvider: info.geoProvider ?? null,
-      },
+      detail: enrichmentDetail(info, detail),
     });
     if (error) {
       // Retry without the enrichment: device/geo detail is nice-to-have, the
@@ -469,7 +534,7 @@ export async function logActivity(
           message: error.message,
         })
       );
-      await svc.from("login_events").insert({
+      const retry = await svc.from("login_events").insert({
         user_id: userId,
         event,
         ip: info.ip,
@@ -477,8 +542,71 @@ export async function logActivity(
         city: info.city,
         user_agent: info.userAgent,
       });
+      return (retry.data as { id?: string }[] | null)?.[0]?.id ?? null;
     }
+    return (data as { id?: string }[] | null)?.[0]?.id ?? null;
   } catch {
     // Telemetry must never break the request it is describing.
+    return null;
+  }
+}
+
+/** The jsonb blob stored alongside an event. */
+function enrichmentDetail(
+  info: RequestInfo,
+  extra: Record<string, unknown>
+): Record<string, unknown> {
+  return {
+    ...extra,
+    device: info.device,
+    region: info.region,
+    latitude: info.latitude,
+    longitude: info.longitude,
+    timezone: info.timezone,
+    asn: info.asn,
+    network: info.network,
+    precise: info.precise,
+    geoProvider: info.geoProvider ?? null,
+    ipSource: info.ipSource ?? null,
+    ipChain: info.ipChain ?? [],
+  };
+}
+
+/**
+ * Replace the address on an event that was written without a usable one.
+ *
+ * The browser learns from the server's response that its address was not
+ * visible, then reports what it sees. Recording a *second* event would double
+ * every sign-in in the feed, so the row that was just written is corrected in
+ * place — scoped to the caller's own id, so it cannot be pointed at someone
+ * else's row.
+ */
+export async function amendActivityIp(
+  rowId: string,
+  userId: string,
+  req: Request,
+  hint: string | null,
+  detail: Record<string, unknown> = {}
+): Promise<boolean> {
+  try {
+    const info = await describeRequest(req, hint);
+    // Only correct the row when the hint actually produced the address.
+    if (info.ipSource !== "client-reported" || !info.ip) return false;
+    const { createServiceClient } = await import("@/lib/supabase/server");
+    const svc = await createServiceClient();
+    const { error } = await svc
+      .from("login_events")
+      .update({
+        ip: info.ip,
+        country: info.country,
+        city: info.city,
+        user_agent: info.userAgent,
+        detail: enrichmentDetail(info, detail),
+      })
+      .eq("id", rowId)
+      .eq("user_id", userId);
+    return !error;
+  } catch {
+    return false;
   }
 }

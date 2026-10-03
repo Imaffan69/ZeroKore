@@ -178,6 +178,29 @@ device and gives each user their own map — rendered with **OpenStreetMap**,
 which needs no API key, no account and no signup, so the panel cannot end up
 with a dead map because a key was never added.
 
+**When the deployment hides the address.** Header parsing cannot recover an
+address the network never sent. Behind a proxy, tunnel or hosting layer that
+does not forward the client's IP, every request arrives carrying the same
+infrastructure address — and no header change fixes that. So:
+
+1. Every event records **where its address came from** (`detail.ipSource`:
+   `header:<name>`, `client-reported`, `header-fallback`, `legacy`) and the panel
+   shows it next to each address.
+2. If one address covers ≥80% of events the panel says so outright and names the
+   likely cause instead of leaving staff to guess.
+3. On sign-in the server tells the client when it could not see a routable
+   address; the browser then asks a **keyless, CORS-enabled** echo service
+   (`api.ipify.org`, one request, no account, no tracking identifier) what *it*
+   sees, and the row already written is corrected in place — no duplicate event.
+   The value is cached in `sessionStorage` and in a 12-hour `zk_client_ip`
+   cookie, so **every** later server-recorded event (agent runs, file edits,
+   GitHub syncs) carries the same real address. A healthy deployment makes zero
+   requests to that service.
+
+A reported address is labelled `client-reported` in the audit trail and the panel
+— it is never presented as something the server observed. Rows recorded before
+this existed cannot be reconstructed.
+
 ## Database & RLS
 
 Every user-owned table has RLS; policies use `auth.uid()` only — the client
