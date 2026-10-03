@@ -36,7 +36,8 @@ export interface UserMapProps {
 /** Degrees of longitude/latitude around the point — roughly a city view. */
 const SPAN = 0.35;
 
-/** Inlined at build time; absent means the Google tab stays hidden. */
+/** Inlined at build time. Empty means Google Maps has no Embed API key here, and
+ *  the Google tab falls back to explaining that instead of loading a map. */
 const GOOGLE_MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? "";
 
 function clampLat(lat: number): number {
