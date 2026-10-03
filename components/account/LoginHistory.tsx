@@ -12,6 +12,9 @@ interface LoginEvent {
   created_at: string;
 }
 
+/** Labels for every event `login_events` accepts (migration 009 widened the
+ *  column's CHECK constraint, so server-recorded activity lands here too).
+ *  Without these, an agent run rendered as the raw `agent_run`. */
 const EVENT_LABEL: Record<string, string> = {
   login: "Login",
   logout: "Logout",
@@ -20,6 +23,11 @@ const EVENT_LABEL: Record<string, string> = {
   mfa_verify: "MFA verify",
   password_change: "Password change",
   session_revoke: "Sessions revoked",
+  agent_run: "Agent run",
+  file_edit: "File edit",
+  project_create: "Project created",
+  github_sync: "GitHub connected",
+  page_view: "Page view",
 };
 
 /** The user's own security history: IP, approximate location, device. */
