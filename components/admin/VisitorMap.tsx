@@ -11,12 +11,13 @@ import { EASE } from "@/lib/motion";
  *
  * Every marker is a sign-in that carried a resolved latitude/longitude — the
  * panel never guesses a position from an IP string, and rows without a
- * coordinate are simply not drawn. Equirectangular projection means a point is
- * placed with two lines of maths, so there is no mapping SDK, no API key and no
- * third-party script loading an admin page and observing who looks at it.
+ * coordinate are simply not drawn. This overview stays a self-contained SVG
+ * (equirectangular projection, two lines of maths) so it costs no API key and
+ * loads no third-party script on an admin page; the per-user maps below it are
+ * keyless embeds.
  *
- * Pure black and white with the sage accent, per the product's design system:
- * land is a hairline, active markers are the only colour on screen.
+ * Pure black and white, per the product's design system: land is a hairline and
+ * the markers are the only thing on screen that draws the eye.
  */
 
 export interface MapPoint {
@@ -32,9 +33,9 @@ export interface MapPoint {
 }
 
 function markerColor(event: string): string {
-  if (event === "login" || event === "signup") return "#4ade80";
-  if (event === "mfa_verify" || event === "password_change") return "#fbbf24";
-  return "#b5cfa0";
+  if (event === "login" || event === "signup") return "#ffffff";
+  if (event === "mfa_verify" || event === "password_change") return "#d4d4d4";
+  return "#a3a3a3";
 }
 
 export default function VisitorMap({ points }: { points: MapPoint[] }) {
